@@ -42,5 +42,19 @@ namespace SmartFarmSEP490.API.Controllers
 
             return Ok(new { message = "User registered successfully" });
         }
+
+        [HttpPost("google-login")]
+        public async Task<IActionResult> GoogleLogin([FromBody] GoogleLoginRequest request)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            var result = await _authService.LoginWithGoogleAsync(request);
+
+            if (result == null)
+                return Unauthorized(new { message = "Invalid Google token" });
+
+            return Ok(result);
+        }
     }
 }

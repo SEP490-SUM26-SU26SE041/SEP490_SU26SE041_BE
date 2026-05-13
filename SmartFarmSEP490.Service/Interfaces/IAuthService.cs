@@ -6,5 +6,6 @@ namespace SmartFarmSEP490.Service.Interfaces
     {
         Task<LoginResponse?> LoginAsync(LoginRequest request);
         Task<bool> RegisterAsync(RegisterRequest request);
+        Task<LoginResponse?> LoginWithGoogleAsync(GoogleLoginRequest request);
     }
 }
