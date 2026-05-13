@@ -15,7 +15,7 @@ namespace SmartFarmSEP490.Repository
 
         public async Task<User?> GetUserByEmailAsync(string email)
         {
-            return await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
+            return await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == email.ToLower().Trim());
         }
 
         public async Task<User> AddUserAsync(User user)
@@ -23,6 +23,12 @@ namespace SmartFarmSEP490.Repository
             await _context.Users.AddAsync(user);
             await _context.SaveChangesAsync();
             return user;
+        }
+
+        public async Task UpdateUserAsync(User user)
+        {
+            _context.Users.Update(user);
+            await _context.SaveChangesAsync();
         }
     }
 }

@@ -15,18 +15,19 @@ namespace SmartFarmSEP490.Service
     {
         private readonly IUserRepository _userRepository;
         private readonly IConfiguration _configuration;
+        private readonly IEmailService _emailService;
 
-        public AuthService(IUserRepository userRepository, IConfiguration configuration)
+        public AuthService(IUserRepository userRepository, IConfiguration configuration, IEmailService emailService)
         {
             _userRepository = userRepository;
             _configuration = configuration;
+            _emailService = emailService;
         }
 
         public async Task<LoginResponse?> LoginAsync(LoginRequest request)
         {
             var user = await _userRepository.GetUserByEmailAsync(request.Email);
             
-            // Note: In production, use BCrypt or similar for password hashing
             if (user == null || user.PasswordHash != request.Password)
             {
                 return null;
@@ -52,8 +53,8 @@ namespace SmartFarmSEP490.Service
             {
                 FullName = request.FullName,
                 Email = request.Email,
-                PasswordHash = request.Password, // In prod: Hash this!
-                Role = request.Role
+                PasswordHash = request.Password,
+                Role = request.Role ?? "Student"
             };
 
             await _userRepository.AddUserAsync(user);
@@ -64,7 +65,6 @@ namespace SmartFarmSEP490.Service
         {
             try
             {
-                // Gọi API của Google để lấy thông tin người dùng từ access_token
                 using var httpClient = new HttpClient();
                 var googleResponse = await httpClient.GetAsync($"https://www.googleapis.com/oauth2/v3/userinfo?access_token={request.Token}");
                 
@@ -81,12 +81,11 @@ namespace SmartFarmSEP490.Service
 
                 if (user == null)
                 {
-                    // Tự động tạo User mới nếu chưa có trong hệ thống
                     user = new User
                     {
                         FullName = googleUser.Name ?? "Google User",
                         Email = googleUser.Email,
-                        PasswordHash = Guid.NewGuid().ToString(), // Password giả cho acc Google
+                        PasswordHash = Guid.NewGuid().ToString(),
                         Role = "Student"
                     };
                     await _userRepository.AddUserAsync(user);
@@ -111,6 +110,47 @@ namespace SmartFarmSEP490.Service
         {
             public string Name { get; set; } = string.Empty;
             public string Email { get; set; } = string.Empty;
+        }
+
+        public async Task<bool> ForgotPasswordAsync(string email)
+        {
+            var user = await _userRepository.GetUserByEmailAsync(email.Trim());
+            if (user == null) return false;
+
+            var code = new Random().Next(100000, 999999).ToString();
+            user.ResetCode = code;
+            user.ResetCodeExpires = DateTime.UtcNow.AddMinutes(10);
+
+            await _userRepository.UpdateUserAsync(user);
+
+            var subject = "Mã xác nhận khôi phục mật khẩu - Smart Farm";
+            var body = $"<h3>Mã xác nhận của bạn là: <b style='color:red'>{code}</b></h3><p>Mã này sẽ hết hạn sau 10 phút.</p>";
+            await _emailService.SendEmailAsync(email, subject, body);
+
+            return true;
+        }
+
+        public async Task<bool> VerifyResetCodeAsync(string email, string code)
+        {
+            var user = await _userRepository.GetUserByEmailAsync(email);
+            if (user == null || user.ResetCode != code || user.ResetCodeExpires < DateTime.UtcNow)
+                return false;
+
+            return true;
+        }
+
+        public async Task<bool> ResetPasswordAsync(string email, string code, string newPassword)
+        {
+            var user = await _userRepository.GetUserByEmailAsync(email);
+            if (user == null || user.ResetCode != code || user.ResetCodeExpires < DateTime.UtcNow)
+                return false;
+
+            user.PasswordHash = newPassword;
+            user.ResetCode = null;
+            user.ResetCodeExpires = null;
+            
+            await _userRepository.UpdateUserAsync(user);
+            return true;
         }
 
         private string GenerateJwtToken(User user)

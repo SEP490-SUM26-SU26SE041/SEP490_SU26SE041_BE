@@ -6,5 +6,6 @@ namespace SmartFarmSEP490.Repository.Interfaces
     {
         Task<User?> GetUserByEmailAsync(string email);
         Task<User> AddUserAsync(User user);
+        Task UpdateUserAsync(User user);
     }
 }

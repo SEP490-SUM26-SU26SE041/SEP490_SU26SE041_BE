@@ -9,15 +9,13 @@ using SmartFarmSEP490.Service.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 1. Configure PostgreSQL
 builder.Services.AddDbContext<SmartFarmDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// 2. Dependency Injection
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IEmailService, EmailService>();
 
-// 3. Configure JWT Authentication
 var jwtSettings = builder.Configuration.GetSection("Jwt");
 var key = Encoding.UTF8.GetBytes(jwtSettings["Key"]!);
 
@@ -40,7 +38,6 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
-// 4. Configure CORS
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll",
@@ -85,15 +82,12 @@ try
 {
     var app = builder.Build();
 
-    // Tự động tạo Database và Table nếu chưa có
     using (var scope = app.Services.CreateScope())
     {
         var dbContext = scope.ServiceProvider.GetRequiredService<SmartFarmDbContext>();
-        // EnsureCreated() sẽ tự động tạo Database và Table ngay lập tức nếu chưa có
         dbContext.Database.EnsureCreated();
     }
 
-    // Configure the HTTP request pipeline.
     if (app.Environment.IsDevelopment())
     {
         app.UseSwagger();
