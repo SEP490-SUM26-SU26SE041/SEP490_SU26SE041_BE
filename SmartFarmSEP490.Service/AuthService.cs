@@ -8,6 +8,7 @@ using SmartFarmSEP490.Model;
 using SmartFarmSEP490.Model.DTOs;
 using SmartFarmSEP490.Repository.Interfaces;
 using SmartFarmSEP490.Service.Interfaces;
+using BCrypt.Net;
 
 namespace SmartFarmSEP490.Service
 {
@@ -28,7 +29,7 @@ namespace SmartFarmSEP490.Service
         {
             var user = await _userRepository.GetUserByEmailAsync(request.Email);
             
-            if (user == null || user.PasswordHash != request.Password)
+            if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
             {
                 return null;
             }
@@ -53,7 +54,7 @@ namespace SmartFarmSEP490.Service
             {
                 FullName = request.FullName,
                 Email = request.Email,
-                PasswordHash = request.Password,
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
                 Role = request.Role ?? "Student"
             };
 
@@ -85,7 +86,7 @@ namespace SmartFarmSEP490.Service
                     {
                         FullName = googleUser.Name ?? "Google User",
                         Email = googleUser.Email,
-                        PasswordHash = Guid.NewGuid().ToString(),
+                        PasswordHash = BCrypt.Net.BCrypt.HashPassword(Guid.NewGuid().ToString()),
                         Role = "Student"
                     };
                     await _userRepository.AddUserAsync(user);
@@ -155,7 +156,15 @@ namespace SmartFarmSEP490.Service
                         </div>
                     </div>
                 </div>";
-            await _emailService.SendEmailAsync(email, subject, body);
+            try
+            {
+                await _emailService.SendEmailAsync(email, subject, body);
+            }
+            catch (Exception ex)
+            {
+                // Log error if needed: Console.WriteLine(ex.Message);
+                return false;
+            }
 
             return true;
         }
@@ -175,7 +184,7 @@ namespace SmartFarmSEP490.Service
             if (user == null || user.ResetCode != code || user.ResetCodeExpires < DateTime.UtcNow)
                 return false;
 
-            user.PasswordHash = newPassword;
+            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
             user.ResetCode = null;
             user.ResetCodeExpires = null;
             

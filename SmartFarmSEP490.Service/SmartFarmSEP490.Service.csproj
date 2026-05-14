@@ -13,6 +13,7 @@
     <PackageReference Include="Google.Apis.Auth" Version="1.67.0" />
     <PackageReference Include="MailKit" Version="4.3.0" />
     <PackageReference Include="MimeKit" Version="4.3.0" />
+    <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
     <ProjectReference Include="..\SmartFarmSEP490.Repository\SmartFarmSEP490.Repository.csproj" />
     <ProjectReference Include="..\SmartFarmSEP490.Model\SmartFarmSEP490.Model.csproj" />
   </ItemGroup>
