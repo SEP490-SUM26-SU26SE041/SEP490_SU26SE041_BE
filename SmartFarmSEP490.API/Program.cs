@@ -85,6 +85,7 @@ try
     using (var scope = app.Services.CreateScope())
     {
         var dbContext = scope.ServiceProvider.GetRequiredService<SmartFarmDbContext>();
+        dbContext.Database.EnsureDeleted(); 
         dbContext.Database.EnsureCreated();
     }
 

@@ -29,8 +29,16 @@ namespace SmartFarmSEP490.Service
         {
             var user = await _userRepository.GetUserByEmailAsync(request.Email);
             
-            if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
+            try
             {
+                if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
+                {
+                    return null;
+                }
+            }
+            catch (Exception)
+            {
+                // Trả về null nếu hash trong DB không đúng định dạng (ví dụ đang là plain text)
                 return null;
             }
 
