@@ -2,10 +2,15 @@ using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
-using SmartFarmSEP490.Repository;
-using SmartFarmSEP490.Repository.Interfaces;
-using SmartFarmSEP490.Service;
-using SmartFarmSEP490.Service.Interfaces;
+using SmartFarmSEP490.Repository.DbContexts;
+using SmartFarmSEP490.Repository.Interfaces.Auth;
+using SmartFarmSEP490.Repository.Implementations.Auth;
+using SmartFarmSEP490.Service.Interfaces.Auth;
+using SmartFarmSEP490.Service.Interfaces.Helpers;
+using SmartFarmSEP490.Service.Services.Auth;
+using SmartFarmSEP490.Service.Services.Helpers;
+using Npgsql;
+using SmartFarmSEP490.Model;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -84,9 +89,8 @@ try
 
     using (var scope = app.Services.CreateScope())
     {
-        var dbContext = scope.ServiceProvider.GetRequiredService<SmartFarmDbContext>();
-        dbContext.Database.EnsureDeleted(); 
-        dbContext.Database.EnsureCreated();
+        // var dbContext = scope.ServiceProvider.GetRequiredService<SmartFarmDbContext>();
+        // dbContext.Database.EnsureCreated(); // Not used for DB First
     }
 
     if (app.Environment.IsDevelopment())

@@ -1,8 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using SmartFarmSEP490.Model;
-using SmartFarmSEP490.Repository.Interfaces;
+using SmartFarmSEP490.Repository.Interfaces.Auth;
+using SmartFarmSEP490.Repository.DbContexts;
+using Task = System.Threading.Tasks.Task;
 
-namespace SmartFarmSEP490.Repository
+namespace SmartFarmSEP490.Repository.Implementations.Auth
 {
     public class UserRepository : IUserRepository
     {

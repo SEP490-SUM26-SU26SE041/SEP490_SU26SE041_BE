@@ -1,6 +1,6 @@
 using SmartFarmSEP490.Model.DTOs;
 
-namespace SmartFarmSEP490.Service.Interfaces
+namespace SmartFarmSEP490.Service.Interfaces.Auth
 {
     public interface IAuthService
     {

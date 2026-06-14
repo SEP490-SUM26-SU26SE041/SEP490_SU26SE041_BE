@@ -6,11 +6,12 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using SmartFarmSEP490.Model;
 using SmartFarmSEP490.Model.DTOs;
-using SmartFarmSEP490.Repository.Interfaces;
-using SmartFarmSEP490.Service.Interfaces;
+using SmartFarmSEP490.Repository.Interfaces.Auth;
+using SmartFarmSEP490.Service.Interfaces.Auth;
+using SmartFarmSEP490.Service.Interfaces.Helpers;
 using BCrypt.Net;
-
-namespace SmartFarmSEP490.Service
+using Task = System.Threading.Tasks.Task;
+namespace SmartFarmSEP490.Service.Services.Auth
 {
     public class AuthService : IAuthService
     {
@@ -128,7 +129,7 @@ namespace SmartFarmSEP490.Service
 
             var code = new Random().Next(100000, 999999).ToString();
             user.ResetCode = code;
-            user.ResetCodeExpires = DateTime.UtcNow.AddMinutes(10);
+            user.ResetCodeExpires = DateTime.Now.AddMinutes(10);
 
             await _userRepository.UpdateUserAsync(user);
 
@@ -180,7 +181,7 @@ namespace SmartFarmSEP490.Service
         public async Task<bool> VerifyResetCodeAsync(string email, string code)
         {
             var user = await _userRepository.GetUserByEmailAsync(email);
-            if (user == null || user.ResetCode != code || user.ResetCodeExpires < DateTime.UtcNow)
+            if (user == null || user.ResetCode != code || user.ResetCodeExpires < DateTime.Now)
                 return false;
 
             return true;
@@ -189,7 +190,7 @@ namespace SmartFarmSEP490.Service
         public async Task<bool> ResetPasswordAsync(string email, string code, string newPassword)
         {
             var user = await _userRepository.GetUserByEmailAsync(email);
-            if (user == null || user.ResetCode != code || user.ResetCodeExpires < DateTime.UtcNow)
+            if (user == null || user.ResetCode != code || user.ResetCodeExpires < DateTime.Now)
                 return false;
 
             user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword);

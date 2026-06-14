@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using SmartFarmSEP490.Model.DTOs;
-using SmartFarmSEP490.Service.Interfaces;
-
+using SmartFarmSEP490.Service.Interfaces.Auth;
 namespace SmartFarmSEP490.API.Controllers
 {
     [Route("api/[controller]")]
