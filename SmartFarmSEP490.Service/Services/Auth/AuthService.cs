@@ -171,7 +171,8 @@ namespace SmartFarmSEP490.Service.Services.Auth
             }
             catch (Exception ex)
             {
-                // Log error if needed: Console.WriteLine(ex.Message);
+                Console.WriteLine($"[EMAIL ERROR]: {ex.Message}");
+                Console.WriteLine(ex.StackTrace);
                 return false;
             }
 
