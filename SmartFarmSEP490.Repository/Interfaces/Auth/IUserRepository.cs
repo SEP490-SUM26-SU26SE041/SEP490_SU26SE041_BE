@@ -1,6 +1,6 @@
 using SmartFarmSEP490.Model;
-
-namespace SmartFarmSEP490.Repository.Interfaces
+using Task = System.Threading.Tasks.Task;
+namespace SmartFarmSEP490.Repository.Interfaces.Auth
 {
     public interface IUserRepository
     {

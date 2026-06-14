@@ -4,13 +4,10 @@ using Microsoft.Extensions.Configuration;
 using MimeKit;
 using MimeKit.Text;
 
-namespace SmartFarmSEP490.Service
-{
-    public interface IEmailService
-    {
-        Task SendEmailAsync(string to, string subject, string body);
-    }
+using SmartFarmSEP490.Service.Interfaces.Helpers;
 
+namespace SmartFarmSEP490.Service.Services.Helpers
+{
     public class EmailService : IEmailService
     {
         private readonly IConfiguration _configuration;

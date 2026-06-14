@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using SmartFarmSEP490.Model.DTOs;
-using SmartFarmSEP490.Service.Interfaces;
-
+using SmartFarmSEP490.Service.Interfaces.Auth;
 namespace SmartFarmSEP490.API.Controllers
 {
     [Route("api/[controller]")]
@@ -61,7 +60,7 @@ namespace SmartFarmSEP490.API.Controllers
         public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
         {
             var result = await _authService.ForgotPasswordAsync(request.Email);
-            if (!result) return BadRequest(new { message = "Email không tồn tại" });
+            if (!result) return BadRequest(new { message = "Email không tồn tại HOẶC cấu hình Gmail bị lỗi!" });
             return Ok(new { message = "Mã xác nhận đã được gửi về Email" });
         }
 
