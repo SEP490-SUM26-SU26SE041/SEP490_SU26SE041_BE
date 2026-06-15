@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace SmartFarmSEP490.Model;
@@ -12,6 +12,8 @@ public partial class RequestReview
     public Guid ReviewerId { get; set; }
 
     public string? Comment { get; set; }
+
+    public string? Result { get; set; }
 
     public DateTime ReviewedAt { get; set; }
 

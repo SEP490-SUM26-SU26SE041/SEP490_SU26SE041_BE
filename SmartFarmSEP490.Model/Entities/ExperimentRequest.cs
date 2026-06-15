@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace SmartFarmSEP490.Model;
@@ -28,6 +28,8 @@ public partial class ExperimentRequest
     public DateTime CreatedAt { get; set; }
 
     public DateTime UpdatedAt { get; set; }
+
+    public string Status { get; set; } = "Pending";
 
     public virtual CropVariety? CropVariety { get; set; }
 
