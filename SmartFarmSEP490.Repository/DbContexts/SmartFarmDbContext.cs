@@ -357,6 +357,10 @@ public partial class SmartFarmDbContext : DbContext
             entity.HasOne(d => d.Researcher).WithMany(p => p.Experiments)
                 .HasForeignKey(d => d.ResearcherId)
                 .HasConstraintName("Experiments_ResearcherId_fkey");
+
+            entity.Property(e => e.Status)
+                .HasMaxLength(20)
+                .HasDefaultValueSql("'Draft'::character varying");
         });
 
         modelBuilder.Entity<ExperimentBedAssignment>(entity =>
@@ -468,6 +472,10 @@ public partial class SmartFarmDbContext : DbContext
             entity.HasOne(d => d.Researcher).WithMany(p => p.ExperimentRequests)
                 .HasForeignKey(d => d.ResearcherId)
                 .HasConstraintName("ExperimentRequests_ResearcherId_fkey");
+
+            entity.Property(e => e.Status)
+                .HasMaxLength(20)
+                .HasDefaultValueSql("'Pending'::character varying");
         });
 
         modelBuilder.Entity<ExperimentStage>(entity =>
