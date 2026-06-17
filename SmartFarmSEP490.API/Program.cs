@@ -60,6 +60,7 @@ builder.Services.AddDbContext<SmartFarmDbContext>(options =>
 
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 
 builder.Services.AddScoped<IExperimentRequestRepository, ExperimentRequestRepository>();
@@ -178,6 +179,8 @@ builder.Services.AddSwaggerGen(options =>
 try
 {
     var app = builder.Build();
+
+
 
     if (app.Environment.IsDevelopment())
     {

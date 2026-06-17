@@ -45,11 +45,13 @@ namespace SmartFarmSEP490.Service.Services.Auth
 
             var token = GenerateJwtToken(user);
 
+            string roleName = user.UserRoles?.FirstOrDefault()?.Role?.RoleName ?? "Student";
+
             return new LoginResponse
             {
                 Token = token,
                 Email = user.Email,
-                Role = user.Role,
+                Role = roleName,
                 FullName = user.FullName
             };
         }
@@ -59,13 +61,20 @@ namespace SmartFarmSEP490.Service.Services.Auth
             var existingUser = await _userRepository.GetUserByEmailAsync(request.Email);
             if (existingUser != null) return false;
 
+            string requestedRole = request.Role ?? "Student";
+            var role = await _userRepository.GetRoleByNameAsync(requestedRole);
+
             var user = new User
             {
                 FullName = request.FullName,
                 Email = request.Email,
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
-                Role = request.Role ?? "Student"
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password)
             };
+
+            if (role != null)
+            {
+                user.UserRoles.Add(new UserRole { RoleId = role.Id, AssignedAt = DateTime.UtcNow });
+            }
 
             await _userRepository.AddUserAsync(user);
             return true;
@@ -95,18 +104,23 @@ namespace SmartFarmSEP490.Service.Services.Auth
                     {
                         FullName = googleUser.Name ?? "Google User",
                         Email = googleUser.Email,
-                        PasswordHash = BCrypt.Net.BCrypt.HashPassword(Guid.NewGuid().ToString()),
-                        Role = "Student"
+                        PasswordHash = BCrypt.Net.BCrypt.HashPassword(Guid.NewGuid().ToString())
                     };
+                    var role = await _userRepository.GetRoleByNameAsync("Student");
+                    if (role != null)
+                    {
+                        user.UserRoles.Add(new UserRole { RoleId = role.Id, AssignedAt = DateTime.UtcNow });
+                    }
                     await _userRepository.AddUserAsync(user);
                 }
 
                 var token = GenerateJwtToken(user);
+                string roleName = user.UserRoles?.FirstOrDefault()?.Role?.RoleName ?? "Student";
                 return new LoginResponse
                 {
                     Token = token,
                     Email = user.Email,
-                    Role = user.Role,
+                    Role = roleName,
                     FullName = user.FullName
                 };
             }
@@ -128,8 +142,10 @@ namespace SmartFarmSEP490.Service.Services.Auth
             if (user == null) return false;
 
             var code = new Random().Next(100000, 999999).ToString();
-            user.ResetCode = code;
-            user.ResetCodeExpires = DateTime.Now.AddMinutes(10);
+            // Database First: The DB doesn't have ResetCode/Expires anymore, so this logic is disabled.
+            // user.ResetCode = code;
+            // user.ResetCodeExpires = DateTime.Now.AddMinutes(10);
+            return false;
 
             await _userRepository.UpdateUserAsync(user);
 
@@ -182,8 +198,11 @@ namespace SmartFarmSEP490.Service.Services.Auth
         public async Task<bool> VerifyResetCodeAsync(string email, string code)
         {
             var user = await _userRepository.GetUserByEmailAsync(email);
-            if (user == null || user.ResetCode != code || user.ResetCodeExpires < DateTime.Now)
+            if (user == null)
                 return false;
+            
+            // Not supported in DB First schema
+            return false;
 
             return true;
         }
@@ -191,12 +210,15 @@ namespace SmartFarmSEP490.Service.Services.Auth
         public async Task<bool> ResetPasswordAsync(string email, string code, string newPassword)
         {
             var user = await _userRepository.GetUserByEmailAsync(email);
-            if (user == null || user.ResetCode != code || user.ResetCodeExpires < DateTime.Now)
+            if (user == null)
                 return false;
 
-            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
-            user.ResetCode = null;
-            user.ResetCodeExpires = null;
+            // Database First: Missing ResetCode support
+            // user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
+            // user.ResetCode = null;
+            // user.ResetCodeExpires = null;
+            
+            return false;
             
             await _userRepository.UpdateUserAsync(user);
             return true;
@@ -208,11 +230,13 @@ namespace SmartFarmSEP490.Service.Services.Auth
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings["Key"] ?? "YourSecretKeyForJWT_MustBeLongEnough"));
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
+            string roleName = user.UserRoles?.FirstOrDefault()?.Role?.RoleName ?? "Student";
+
             var claims = new[]
             {
                 new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
                 new Claim(ClaimTypes.Email, user.Email),
-                new Claim(ClaimTypes.Role, user.Role),
+                new Claim(ClaimTypes.Role, roleName),
                 new Claim("FullName", user.FullName)
             };
 

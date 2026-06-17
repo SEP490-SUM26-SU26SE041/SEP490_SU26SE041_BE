@@ -89,6 +89,7 @@ public partial class SmartFarmDbContext : DbContext
 
     public virtual DbSet<UserSkill> UserSkills { get; set; }
 
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder
@@ -968,11 +969,6 @@ public partial class SmartFarmDbContext : DbContext
             entity.Property(e => e.IsActive).HasDefaultValue(true);
             entity.Property(e => e.PasswordHash).HasMaxLength(255);
             entity.Property(e => e.Phone).HasMaxLength(20);
-            entity.Property(e => e.ResetCode).HasMaxLength(10);
-            entity.Property(e => e.ResetCodeExpires).HasColumnType("timestamp without time zone");
-            entity.Property(e => e.Role)
-                .HasMaxLength(50)
-                .HasDefaultValueSql("'Student'::character varying");
             entity.Property(e => e.UpdatedAt)
                 .HasDefaultValueSql("now()")
                 .HasColumnType("timestamp without time zone");
