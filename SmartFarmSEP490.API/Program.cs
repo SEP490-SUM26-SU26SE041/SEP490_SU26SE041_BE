@@ -49,6 +49,11 @@ using SmartFarmSEP490.Repository.Interfaces.SystemLogs;
 using SmartFarmSEP490.Repository.Implementations.SystemLogs;
 using SmartFarmSEP490.Service.Interfaces.SystemLogs;
 using SmartFarmSEP490.Service.Services.SystemLogs;
+using SmartFarmSEP490.Repository.Interfaces.Notifications;
+using SmartFarmSEP490.Repository.Implementations.Notifications;
+using SmartFarmSEP490.Service.Interfaces.Notifications;
+using SmartFarmSEP490.Service.Services.Notifications;
+using SmartFarmSEP490.Service.Hubs;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -102,6 +107,8 @@ builder.Services.AddScoped<ICropService, CropService>();
 builder.Services.AddScoped<ICropVarietyService, CropVarietyService>();
 builder.Services.AddScoped<ISystemLogRepository, SystemLogRepository>();
 builder.Services.AddScoped<ISystemLogService, SystemLogService>();
+builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
 
 var jwtSettings = builder.Configuration.GetSection("Jwt");
 var key = Encoding.UTF8.GetBytes(jwtSettings["Key"]!);
@@ -128,6 +135,16 @@ builder.Services.AddAuthentication(options =>
     };
     options.Events = new JwtBearerEvents
     {
+        OnMessageReceived = context =>
+        {
+            var accessToken = context.Request.Query["access_token"];
+            var path = context.HttpContext.Request.Path;
+            if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/notificationHub"))
+            {
+                context.Token = accessToken;
+            }
+            return Task.CompletedTask;
+        },
         OnAuthenticationFailed = ctx =>
         {
             Console.WriteLine($"[JWT FAIL] {ctx.Exception.GetType().Name}: {ctx.Exception.Message}");
@@ -155,6 +172,7 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddControllers();
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddSignalR();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
@@ -218,6 +236,7 @@ try
     app.UseAuthorization();
 
     app.MapControllers();
+    app.MapHub<NotificationHub>("/notificationHub");
 
     app.Run();
 }
