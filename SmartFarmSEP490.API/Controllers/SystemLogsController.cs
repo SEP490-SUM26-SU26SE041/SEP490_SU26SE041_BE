@@ -19,8 +19,15 @@ namespace SmartFarmSEP490.API.Controllers
         [HttpGet]
         public async Task<IActionResult> GetLogs([FromQuery] SystemLogFilterDto filter)
         {
-            var logs = await _systemLogService.GetLogsAsync(filter);
-            return Ok(logs);
+            try
+            {
+                var logs = await _systemLogService.GetLogsAsync(filter);
+                return Ok(logs);
+            }
+            catch (System.Exception ex)
+            {
+                return StatusCode(500, new { message = ex.Message, inner = ex.InnerException?.Message, stackTrace = ex.StackTrace });
+            }
         }
 
         [HttpPost("mock")]

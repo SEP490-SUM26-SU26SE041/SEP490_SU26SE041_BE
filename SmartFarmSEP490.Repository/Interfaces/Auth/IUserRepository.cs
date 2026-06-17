@@ -12,5 +12,6 @@ namespace SmartFarmSEP490.Repository.Interfaces.Auth
         Task<List<Role>> GetAllRolesAsync();
         Task<User> AddUserAsync(User user);
         Task UpdateUserAsync(User user);
+        Task DeleteUserAsync(User user);
     }
 }

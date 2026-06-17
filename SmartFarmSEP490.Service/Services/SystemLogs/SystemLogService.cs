@@ -40,7 +40,7 @@ namespace SmartFarmSEP490.Service.Services.SystemLogs
                 Description = l.Description,
                 IpAddress = l.IpAddress,
                 UserAgent = l.UserAgent,
-                Metadata = l.Metadata,
+                Metadata = l.Metadata?.RootElement.ToString(),
                 CreatedAt = l.CreatedAt
             }).ToList();
 
@@ -73,7 +73,7 @@ namespace SmartFarmSEP490.Service.Services.SystemLogs
                 Description = scenario.Desc,
                 IpAddress = "192.168.1." + random.Next(1, 255),
                 UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-                Metadata = "{\"mock\": true}",
+                Metadata = System.Text.Json.JsonDocument.Parse("{\"mock\": true}"),
                 CreatedAt = DateTime.UtcNow,
                 UserId = scenario.Action != "ERROR" ? Guid.NewGuid() : null
             };
@@ -89,7 +89,7 @@ namespace SmartFarmSEP490.Service.Services.SystemLogs
                 Description = log.Description,
                 IpAddress = log.IpAddress,
                 UserAgent = log.UserAgent,
-                Metadata = log.Metadata,
+                Metadata = log.Metadata?.RootElement.ToString(),
                 CreatedAt = log.CreatedAt
             };
         }

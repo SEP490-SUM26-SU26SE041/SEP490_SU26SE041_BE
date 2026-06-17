@@ -6,22 +6,22 @@ namespace SmartFarmSEP490.Model.DTOs
     {
         public Guid Id { get; set; }
         public Guid? UserId { get; set; }
-        public string UserEmail { get; set; }
+        public string? UserEmail { get; set; }
         public string Action { get; set; }
-        public string EntityName { get; set; }
+        public string? EntityName { get; set; }
         public Guid? EntityId { get; set; }
-        public string Description { get; set; }
-        public string IpAddress { get; set; }
-        public string UserAgent { get; set; }
-        public string Metadata { get; set; }
+        public string? Description { get; set; }
+        public string? IpAddress { get; set; }
+        public string? UserAgent { get; set; }
+        public string? Metadata { get; set; }
         public DateTime CreatedAt { get; set; }
     }
 
     public class SystemLogFilterDto
     {
-        public string Action { get; set; }
-        public string EntityName { get; set; }
-        public string SearchTerm { get; set; }
+        public string? Action { get; set; }
+        public string? EntityName { get; set; }
+        public string? SearchTerm { get; set; }
         public DateTime? StartDate { get; set; }
         public DateTime? EndDate { get; set; }
         public int PageNumber { get; set; } = 1;
