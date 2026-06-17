@@ -91,7 +91,7 @@ public partial class SmartFarmDbContext : DbContext
 
     public virtual DbSet<SystemLog> SystemLogs { get; set; }
 
-
+    public virtual DbSet<SmartFarmSEP490.Model.Entities.Notification> Notifications { get; set; }
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder
@@ -194,6 +194,18 @@ public partial class SmartFarmDbContext : DbContext
                 .HasForeignKey(d => d.FarmId)
                 .HasConstraintName("Areas_FarmId_fkey");
         });
+
+        modelBuilder.Entity<SmartFarmSEP490.Model.Entities.Notification>()
+            .HasOne(n => n.Recipient)
+            .WithMany(u => u.NotificationRecipients)
+            .HasForeignKey(n => n.RecipientId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<SmartFarmSEP490.Model.Entities.Notification>()
+            .HasOne(n => n.Sender)
+            .WithMany(u => u.NotificationSenders)
+            .HasForeignKey(n => n.SenderId)
+            .OnDelete(DeleteBehavior.SetNull);
 
         modelBuilder.Entity<Batch>(entity =>
         {

@@ -62,4 +62,8 @@ public partial class User
     public virtual ICollection<UserRole> UserRoles { get; set; } = new List<UserRole>();
 
     public virtual ICollection<UserSkill> UserSkills { get; set; } = new List<UserSkill>();
+
+    public virtual ICollection<SmartFarmSEP490.Model.Entities.Notification> NotificationRecipients { get; set; } = new List<SmartFarmSEP490.Model.Entities.Notification>();
+
+    public virtual ICollection<SmartFarmSEP490.Model.Entities.Notification> NotificationSenders { get; set; } = new List<SmartFarmSEP490.Model.Entities.Notification>();
 }
