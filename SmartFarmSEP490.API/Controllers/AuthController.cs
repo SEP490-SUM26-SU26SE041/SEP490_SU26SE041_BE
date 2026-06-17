@@ -28,6 +28,7 @@ namespace SmartFarmSEP490.API.Controllers
             return Ok(result);
         }
 
+        /*
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] RegisterRequest request)
         {
@@ -41,6 +42,7 @@ namespace SmartFarmSEP490.API.Controllers
 
             return Ok(new { message = "User registered successfully" });
         }
+        */
 
         [HttpPost("google-login")]
         public async Task<IActionResult> GoogleLogin([FromBody] GoogleLoginRequest request)

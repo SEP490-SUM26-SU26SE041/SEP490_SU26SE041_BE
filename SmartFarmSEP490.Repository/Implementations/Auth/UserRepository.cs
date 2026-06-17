@@ -36,7 +36,6 @@ namespace SmartFarmSEP490.Repository.Implementations.Auth
             return await _context.Users
                 .Include(u => u.UserRoles)
                     .ThenInclude(ur => ur.Role)
-                .Where(u => u.DeletedAt == null)
                 .ToListAsync();
         }
 
@@ -65,6 +64,12 @@ namespace SmartFarmSEP490.Repository.Implementations.Auth
         public async Task UpdateUserAsync(User user)
         {
             _context.Users.Update(user);
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task DeleteUserAsync(User user)
+        {
+            _context.Users.Remove(user);
             await _context.SaveChangesAsync();
         }
     }

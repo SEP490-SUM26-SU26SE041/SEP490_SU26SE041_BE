@@ -135,12 +135,8 @@ namespace SmartFarmSEP490.Service.Services.Auth
             var user = await _userRepository.GetUserByIdAsync(id);
             if (user == null) return false;
 
-            // Soft delete
-            user.DeletedAt = DateTime.UtcNow;
-            user.IsActive = false;
-            user.UpdatedAt = DateTime.UtcNow;
-
-            await _userRepository.UpdateUserAsync(user);
+            // Hard delete
+            await _userRepository.DeleteUserAsync(user);
             return true;
         }
 

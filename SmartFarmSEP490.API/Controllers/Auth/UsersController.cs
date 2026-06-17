@@ -48,7 +48,7 @@ namespace SmartFarmSEP490.API.Controllers.Auth
             var user = await _userService.CreateUserAsync(request);
             if (user == null)
             {
-                return BadRequest(new { Message = "Email already exists or Role is invalid." });
+                return BadRequest(new { Message = "Email này đã tồn tại trong hệ thống." });
             }
 
             return CreatedAtAction(nameof(GetUserById), new { id = user.Id }, user);

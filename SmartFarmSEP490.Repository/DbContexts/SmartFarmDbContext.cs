@@ -89,6 +89,8 @@ public partial class SmartFarmDbContext : DbContext
 
     public virtual DbSet<UserSkill> UserSkills { get; set; }
 
+    public virtual DbSet<SystemLog> SystemLogs { get; set; }
+
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -1011,6 +1013,26 @@ public partial class SmartFarmDbContext : DbContext
             entity.HasOne(d => d.User).WithMany(p => p.UserSkills)
                 .HasForeignKey(d => d.UserId)
                 .HasConstraintName("UserSkills_UserId_fkey");
+        });
+
+        modelBuilder.Entity<SystemLog>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("SystemLogs_pkey");
+
+            entity.HasIndex(e => e.UserId, "IX_SystemLogs_UserId");
+            entity.HasIndex(e => e.Action, "IX_SystemLogs_Action");
+            entity.HasIndex(e => new { e.EntityName, e.EntityId }, "IX_SystemLogs_Entity");
+            entity.HasIndex(e => e.CreatedAt, "IX_SystemLogs_CreatedAt");
+
+            entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("now()")
+                .HasColumnType("timestamp with time zone");
+
+            entity.HasOne(d => d.User).WithMany()
+                .HasForeignKey(d => d.UserId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("SystemLogs_UserId_fkey");
         });
 
         OnModelCreatingPartial(modelBuilder);

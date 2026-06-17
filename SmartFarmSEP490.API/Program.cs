@@ -45,6 +45,10 @@ using SmartFarmSEP490.Service.Services.Experiments;
 using SmartFarmSEP490.Service.Services.ExperimentRequests;
 using SmartFarmSEP490.Service.Services.Helpers;
 using SmartFarmSEP490.Service.Services.Resources;
+using SmartFarmSEP490.Repository.Interfaces.SystemLogs;
+using SmartFarmSEP490.Repository.Implementations.SystemLogs;
+using SmartFarmSEP490.Service.Interfaces.SystemLogs;
+using SmartFarmSEP490.Service.Services.SystemLogs;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -96,6 +100,8 @@ builder.Services.AddScoped<IExperimentBedAssignmentService, ExperimentBedAssignm
 builder.Services.AddScoped<IBatchService, BatchService>();
 builder.Services.AddScoped<ICropService, CropService>();
 builder.Services.AddScoped<ICropVarietyService, CropVarietyService>();
+builder.Services.AddScoped<ISystemLogRepository, SystemLogRepository>();
+builder.Services.AddScoped<ISystemLogService, SystemLogService>();
 
 var jwtSettings = builder.Configuration.GetSection("Jwt");
 var key = Encoding.UTF8.GetBytes(jwtSettings["Key"]!);
@@ -148,6 +154,7 @@ builder.Services.AddCors(options =>
 });
 
 builder.Services.AddControllers();
+builder.Services.AddHttpContextAccessor();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {

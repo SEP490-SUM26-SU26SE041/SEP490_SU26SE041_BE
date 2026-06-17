@@ -2,11 +2,13 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using Google.Apis.Auth;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using SmartFarmSEP490.Model;
 using SmartFarmSEP490.Model.DTOs;
 using SmartFarmSEP490.Repository.Interfaces.Auth;
+using SmartFarmSEP490.Repository.Interfaces.SystemLogs;
 using SmartFarmSEP490.Service.Interfaces.Auth;
 using SmartFarmSEP490.Service.Interfaces.Helpers;
 using BCrypt.Net;
@@ -18,12 +20,16 @@ namespace SmartFarmSEP490.Service.Services.Auth
         private readonly IUserRepository _userRepository;
         private readonly IConfiguration _configuration;
         private readonly IEmailService _emailService;
+        private readonly ISystemLogRepository _systemLogRepository;
+        private readonly IHttpContextAccessor _httpContextAccessor;
 
-        public AuthService(IUserRepository userRepository, IConfiguration configuration, IEmailService emailService)
+        public AuthService(IUserRepository userRepository, IConfiguration configuration, IEmailService emailService, ISystemLogRepository systemLogRepository, IHttpContextAccessor httpContextAccessor)
         {
             _userRepository = userRepository;
             _configuration = configuration;
             _emailService = emailService;
+            _systemLogRepository = systemLogRepository;
+            _httpContextAccessor = httpContextAccessor;
         }
 
         public async Task<LoginResponse?> LoginAsync(LoginRequest request)
@@ -47,13 +53,32 @@ namespace SmartFarmSEP490.Service.Services.Auth
 
             string roleName = user.UserRoles?.FirstOrDefault()?.Role?.RoleName ?? "Student";
 
-            return new LoginResponse
+            var response = new LoginResponse
             {
                 Token = token,
                 Email = user.Email,
                 Role = roleName,
                 FullName = user.FullName
             };
+
+            var httpContext = _httpContextAccessor.HttpContext;
+            var ipAddress = httpContext?.Connection?.RemoteIpAddress?.ToString();
+            var userAgent = httpContext?.Request?.Headers["User-Agent"].ToString();
+            var metadataStr = System.Text.Json.JsonSerializer.Serialize(new { method = "local_auth", role = roleName });
+
+            await _systemLogRepository.AddLogAsync(new SystemLog
+            {
+                UserId = user.Id,
+                Action = "LOGIN",
+                EntityName = "Users",
+                EntityId = user.Id,
+                Description = $"Người dùng {user.FullName} ({user.Email}) đăng nhập thành công.",
+                IpAddress = ipAddress,
+                UserAgent = userAgent,
+                Metadata = System.Text.Json.JsonDocument.Parse(metadataStr)
+            });
+
+            return response;
         }
 
         public async Task<bool> RegisterAsync(RegisterRequest request)
@@ -116,13 +141,33 @@ namespace SmartFarmSEP490.Service.Services.Auth
 
                 var token = GenerateJwtToken(user);
                 string roleName = user.UserRoles?.FirstOrDefault()?.Role?.RoleName ?? "Student";
-                return new LoginResponse
+
+                var response = new LoginResponse
                 {
                     Token = token,
                     Email = user.Email,
                     Role = roleName,
                     FullName = user.FullName
                 };
+
+                var httpContext = _httpContextAccessor.HttpContext;
+                var ipAddress = httpContext?.Connection?.RemoteIpAddress?.ToString();
+                var userAgent = httpContext?.Request?.Headers["User-Agent"].ToString();
+                var metadataStr = System.Text.Json.JsonSerializer.Serialize(new { method = "google_auth", role = roleName });
+
+                await _systemLogRepository.AddLogAsync(new SystemLog
+                {
+                    UserId = user.Id,
+                    Action = "LOGIN",
+                    EntityName = "Users",
+                    EntityId = user.Id,
+                    Description = $"Người dùng {user.FullName} ({user.Email}) đăng nhập qua Google thành công.",
+                    IpAddress = ipAddress,
+                    UserAgent = userAgent,
+                    Metadata = System.Text.Json.JsonDocument.Parse(metadataStr)
+                });
+
+                return response;
             }
             catch (Exception)
             {
