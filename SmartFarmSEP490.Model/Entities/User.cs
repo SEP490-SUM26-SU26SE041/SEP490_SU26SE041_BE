@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace SmartFarmSEP490.Model;
@@ -12,12 +12,6 @@ public partial class User
     public string Email { get; set; } = null!;
 
     public string PasswordHash { get; set; } = null!;
-
-    public string Role { get; set; } = null!;
-
-    public string? ResetCode { get; set; }
-
-    public DateTime? ResetCodeExpires { get; set; }
 
     public string? Phone { get; set; }
 
