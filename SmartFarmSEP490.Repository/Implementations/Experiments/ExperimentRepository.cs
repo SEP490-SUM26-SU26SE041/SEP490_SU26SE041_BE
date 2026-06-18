@@ -45,6 +45,25 @@ public class ExperimentRepository : IExperimentRepository
         await _context.Experiments.AddAsync(entity); await _context.SaveChangesAsync(); return entity;
     }
 
+    public async Task<M.Experiment> CreateWithStagesAsync(M.Experiment entity, IEnumerable<M.ExperimentStage> stages)
+    {
+        using var tx = await _context.Database.BeginTransactionAsync();
+        entity.CreatedAt = DateTime.UtcNow; entity.UpdatedAt = DateTime.UtcNow;
+        await _context.Experiments.AddAsync(entity);
+        await _context.SaveChangesAsync();
+        var now = DateTime.UtcNow;
+        foreach (var s in stages)
+        {
+            s.ExperimentId = entity.Id;
+            s.CreatedAt = now;
+            s.UpdatedAt = now;
+        }
+        await _context.ExperimentStages.AddRangeAsync(stages);
+        await _context.SaveChangesAsync();
+        await tx.CommitAsync();
+        return entity;
+    }
+
     public async Task UpdateAsync(M.Experiment entity)
     {
         entity.UpdatedAt = DateTime.UtcNow;

@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using M = SmartFarmSEP490.Model;
+using SmartFarmSEP490.Model.DTOs;
 using SmartFarmSEP490.Repository.DbContexts;
 using SmartFarmSEP490.Repository.Interfaces.Farms;
 using Task = System.Threading.Tasks.Task;
@@ -46,5 +47,38 @@ public class FarmRepository : IFarmRepository
     {
         var e = await _context.Farms.FindAsync(id);
         if (e != null) { e.DeletedAt = DateTime.UtcNow; await UpdateAsync(e); }
+    }
+
+    public async Task<FarmResourceSummaryDto?> GetFarmResourceSummaryAsync(Guid farmId)
+    {
+        var farm = await _context.Farms.FindAsync(farmId);
+        if (farm == null) return null;
+
+        var beds = await _context.Beds
+            .Include(b => b.Area)
+            .Include(b => b.ExperimentBedAssignments)
+            .Where(b => b.Area.FarmId == farmId && b.DeletedAt == null)
+            .ToListAsync();
+
+        var totalSensors = await _context.Sensors.CountAsync();
+
+        var inUseAssignments = beds
+            .SelectMany(b => b.ExperimentBedAssignments)
+            .Where(a => a.AssignedTo == null)
+            .Select(a => a.BedId)
+            .Distinct()
+            .Count();
+
+        return new FarmResourceSummaryDto
+        {
+            FarmId = farmId,
+            FarmName = farm.FarmName,
+            TotalBeds = beds.Count,
+            AvailableBeds = beds.Count - inUseAssignments,
+            InUseBeds = inUseAssignments,
+            MaintenanceBeds = 0,
+            TotalSensors = totalSensors,
+            TotalAreas = beds.Select(b => b.AreaId).Distinct().Count()
+        };
     }
 }

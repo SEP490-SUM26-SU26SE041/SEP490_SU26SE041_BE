@@ -160,6 +160,25 @@ public class ExperimentRequestsController : ControllerBase
 
     // ============ Manager: review (accept / reject) ============
 
+    [HttpGet("{id:guid}/resource-summary")]
+    public async Task<IActionResult> GetResourceSummary(Guid id)
+    {
+        var role = GetRole();
+        if (role != "Manager")
+            return StatusCode(403, new { error = "Only Manager can view resource summary" });
+
+        var request = await _service.GetByIdAsync(id);
+        if (request == null) return NotFound();
+
+        var farm = await _farmRepository.GetByIdAsync(request.FarmId);
+        if (farm == null) return NotFound(new { error = "Farm not found" });
+        if (farm.ManagerId != GetUserId())
+            return StatusCode(403, new { error = "You are not the Manager of this farm" });
+
+        var result = await _service.ValidateResourcesAsync(id);
+        return result == null ? NotFound() : Ok(result);
+    }
+
     [HttpPost("{id:guid}/review")]
     public async Task<IActionResult> Review(Guid id, [FromBody] ReviewExperimentRequestDto dto)
     {

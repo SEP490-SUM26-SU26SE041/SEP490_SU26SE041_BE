@@ -30,7 +30,12 @@ public class ProcedureTemplateRepository : IProcedureTemplateRepository
     public async Task<M.ProcedureTemplate> CreateAsync(M.ProcedureTemplate entity)
     {
         entity.CreatedAt = DateTime.UtcNow;
-        await _context.ProcedureTemplates.AddAsync(entity); await _context.SaveChangesAsync(); return entity;
+        foreach (var step in entity.ProcedureTemplateSteps)
+            step.TemplateId = entity.Id;
+        await _context.ProcedureTemplates.AddAsync(entity);
+        await _context.ProcedureTemplateSteps.AddRangeAsync(entity.ProcedureTemplateSteps);
+        await _context.SaveChangesAsync();
+        return entity;
     }
 
     public async Task UpdateAsync(M.ProcedureTemplate entity)

@@ -1,6 +1,7 @@
 using M = SmartFarmSEP490.Model;
 using SmartFarmSEP490.Model.DTOs;
 using SmartFarmSEP490.Repository.Interfaces.ExperimentRequests;
+using SmartFarmSEP490.Repository.Interfaces.Farms;
 using SmartFarmSEP490.Service.Interfaces.ExperimentRequests;
 
 namespace SmartFarmSEP490.Service.Services.ExperimentRequests;
@@ -9,11 +10,16 @@ public class ExperimentRequestService : IExperimentRequestService
 {
     private readonly IExperimentRequestRepository _requestRepository;
     private readonly IRequestReviewRepository _reviewRepository;
+    private readonly IFarmRepository _farmRepository;
 
-    public ExperimentRequestService(IExperimentRequestRepository requestRepository, IRequestReviewRepository reviewRepository)
+    public ExperimentRequestService(
+        IExperimentRequestRepository requestRepository,
+        IRequestReviewRepository reviewRepository,
+        IFarmRepository farmRepository)
     {
         _requestRepository = requestRepository;
         _reviewRepository = reviewRepository;
+        _farmRepository = farmRepository;
     }
 
     public async Task<ExperimentRequestResponseDto?> CreateAsync(CreateExperimentRequestDto dto, Guid researcherId)
@@ -168,6 +174,37 @@ public class ExperimentRequestService : IExperimentRequestService
             return true;
         }
         catch (Exception ex) { throw new Exception($"Delete experiment request failed: {ex.Message}"); }
+    }
+
+    public async Task<ResourceValidationResultDto?> ValidateResourcesAsync(Guid requestId)
+    {
+        try
+        {
+            var request = await _requestRepository.GetByIdAsync(requestId);
+            if (request == null) return null;
+
+            var resources = await _farmRepository.GetFarmResourceSummaryAsync(request.FarmId);
+            if (resources == null) return null;
+
+            bool sufficientBeds = resources.AvailableBeds > 0;
+            bool isValid = sufficientBeds;
+
+            string? message;
+            if (!sufficientBeds)
+                message = $"Farm '{resources.FarmName}' hiện không có beds khả dụng cho thực nghiệm mới (đang có {resources.InUseBeds}/{resources.TotalBeds} beds đang được sử dụng).";
+            else
+                message = $"Farm '{resources.FarmName}' có {resources.AvailableBeds}/{resources.TotalBeds} beds khả dụng cho thực nghiệm.";
+
+            return new ResourceValidationResultDto
+            {
+                IsValid = isValid,
+                SufficientBeds = sufficientBeds,
+                SufficientSensors = resources.TotalSensors > 0,
+                Message = message,
+                Resources = resources
+            };
+        }
+        catch (Exception ex) { throw new Exception($"Validate resources failed: {ex.Message}"); }
     }
 
     private static ExperimentRequestResponseDto MapToResponseDto(M.ExperimentRequest entity)

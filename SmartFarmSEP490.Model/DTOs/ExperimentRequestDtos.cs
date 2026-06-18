@@ -62,3 +62,24 @@ public class RequestReviewResponseDto
     public string Result { get; set; } = string.Empty;
     public DateTime ReviewedAt { get; set; }
 }
+
+public class FarmResourceSummaryDto
+{
+    public Guid FarmId { get; set; }
+    public string FarmName { get; set; } = string.Empty;
+    public int TotalBeds { get; set; }
+    public int AvailableBeds { get; set; }
+    public int InUseBeds { get; set; }
+    public int MaintenanceBeds { get; set; }
+    public int TotalSensors { get; set; }
+    public int TotalAreas { get; set; }
+}
+
+public class ResourceValidationResultDto
+{
+    public bool IsValid { get; set; }
+    public bool SufficientBeds { get; set; }
+    public bool SufficientSensors { get; set; }
+    public string? Message { get; set; }
+    public FarmResourceSummaryDto? Resources { get; set; }
+}

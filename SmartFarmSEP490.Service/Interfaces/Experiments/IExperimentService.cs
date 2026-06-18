@@ -33,7 +33,7 @@ public interface IExperimentGroupService
 public interface IExperimentDesignService
 {
     Task<ExperimentDesignResponseDto?> CreateAsync(Guid experimentId, CreateExperimentDesignDto dto);
-    Task<ExperimentDesignResponseDto?> UpdateAsync(Guid id, UpdateExperimentDesignDto dto);
+    Task<ExperimentDesignResponseDto?> UpdateAsync(Guid experimentId, UpdateExperimentDesignDto dto);
     Task<ExperimentDesignResponseDto?> GetByExperimentAsync(Guid experimentId);
     Task<bool> DeleteAsync(Guid experimentId);
 }

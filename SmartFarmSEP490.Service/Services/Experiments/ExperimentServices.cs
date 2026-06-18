@@ -1,4 +1,5 @@
 using M = SmartFarmSEP490.Model;
+using Microsoft.EntityFrameworkCore;
 using SmartFarmSEP490.Model.DTOs;
 using SmartFarmSEP490.Repository.Interfaces.CareSchedules;
 using SmartFarmSEP490.Repository.Interfaces.ExperimentDesigns;
@@ -7,6 +8,7 @@ using SmartFarmSEP490.Repository.Interfaces.ExperimentStages;
 using SmartFarmSEP490.Repository.Interfaces.Experiments;
 using SmartFarmSEP490.Repository.Interfaces.MeasurementDefinitions;
 using SmartFarmSEP490.Repository.Interfaces.ProcedureTemplates;
+using SmartFarmSEP490.Service.Common;
 using SmartFarmSEP490.Service.Interfaces.Experiments;
 
 namespace SmartFarmSEP490.Service.Services.Experiments;
@@ -14,10 +16,14 @@ namespace SmartFarmSEP490.Service.Services.Experiments;
 public class ExperimentService : IExperimentService
 {
     private readonly IExperimentRepository _experimentRepository;
+    private readonly IProcedureTemplateRepository _templateRepository;
 
-    public ExperimentService(IExperimentRepository experimentRepository)
+    public ExperimentService(
+        IExperimentRepository experimentRepository,
+        IProcedureTemplateRepository templateRepository)
     {
         _experimentRepository = experimentRepository;
+        _templateRepository = templateRepository;
     }
 
     public async Task<ExperimentResponseDto?> CreateAsync(CreateExperimentDto dto, Guid researcherId)
@@ -39,8 +45,29 @@ public class ExperimentService : IExperimentService
                 EndDate = dto.EndDate,
                 Status = "Draft"
             };
-            var result = await _experimentRepository.CreateAsync(entity);
-            return await GetByIdAsync(result.Id);
+
+            if (dto.ProcedureTemplateId.HasValue)
+            {
+                var template = await _templateRepository.GetByIdWithStepsAsync(dto.ProcedureTemplateId.Value);
+                if (template != null && template.ProcedureTemplateSteps != null && template.ProcedureTemplateSteps.Count > 0)
+                {
+                    var stages = template.ProcedureTemplateSteps
+                        .OrderBy(s => s.StepOrder)
+                        .Select(s => new M.ExperimentStage
+                        {
+                            StageOrder = s.StepOrder,
+                            StageName = s.Title,
+                            StageType = s.StageType,
+                            Objective = s.Instruction
+                        })
+                        .ToList();
+                    var result = await _experimentRepository.CreateWithStagesAsync(entity, stages);
+                    return await GetByIdAsync(result.Id);
+                }
+            }
+
+            var resultOnly = await _experimentRepository.CreateAsync(entity);
+            return await GetByIdAsync(resultOnly.Id);
         }
         catch (Exception ex) { throw new Exception($"Create experiment failed: {ex.Message}"); }
     }
@@ -158,7 +185,7 @@ public class ExperimentService : IExperimentService
                 Id = s.Id, StageName = s.StageName, StageOrder = s.StageOrder,
                 Objective = s.Objective, StartDate = s.StartDate, EndDate = s.EndDate,
                 ResultSummary = s.ResultSummary, ResultData = s.ResultData,
-                CreatedAt = s.CreatedAt, UpdatedAt = s.UpdatedAt
+                CreatedAt = s.CreatedAt, UpdatedAt = s.UpdatedAt, StageType = s.StageType.ToString()
             }).ToList() ?? new(),
             Groups = entity.ExperimentGroups?.Select(g => new ExperimentGroupResponseDto
             {
@@ -200,7 +227,8 @@ public class ExperimentStageService : IExperimentStageService
                 StageOrder = dto.StageOrder,
                 Objective = dto.Objective,
                 StartDate = dto.StartDate,
-                EndDate = dto.EndDate
+                EndDate = dto.EndDate,
+                StageType = StageTypeHelper.Parse(dto.StageType)
             };
             var result = await _stageRepository.CreateAsync(entity);
             return MapToResponseDto(result);
@@ -221,6 +249,7 @@ public class ExperimentStageService : IExperimentStageService
             if (dto.EndDate.HasValue) entity.EndDate = dto.EndDate;
             if (dto.ResultSummary != null) entity.ResultSummary = dto.ResultSummary;
             if (dto.ResultData != null) entity.ResultData = dto.ResultData;
+            if (dto.StageType != null) entity.StageType = StageTypeHelper.Parse(dto.StageType);
             await _stageRepository.UpdateAsync(entity);
             return MapToResponseDto(entity);
         }
@@ -256,7 +285,7 @@ public class ExperimentStageService : IExperimentStageService
             Id = entity.Id, StageName = entity.StageName, StageOrder = entity.StageOrder,
             Objective = entity.Objective, StartDate = entity.StartDate, EndDate = entity.EndDate,
             ResultSummary = entity.ResultSummary, ResultData = entity.ResultData,
-            CreatedAt = entity.CreatedAt, UpdatedAt = entity.UpdatedAt
+            CreatedAt = entity.CreatedAt, UpdatedAt = entity.UpdatedAt, StageType = entity.StageType.ToString()
         };
     }
 }
@@ -494,6 +523,7 @@ public class ProcedureTemplateService : IProcedureTemplateService
         {
             var entity = new M.ProcedureTemplate
             {
+                Id = Guid.NewGuid(),
                 CropVarietyId = dto.CropVarietyId,
                 TemplateName = dto.TemplateName,
                 Objective = dto.Objective,
@@ -508,13 +538,15 @@ public class ProcedureTemplateService : IProcedureTemplateService
                     Title = s.Title,
                     Instruction = s.Instruction,
                     ExpectedDurationDays = s.ExpectedDurationDays,
-                    RequiredSkillDescription = s.RequiredSkillDescription
+                    RequiredSkillDescription = s.RequiredSkillDescription,
+                    StageType = StageTypeHelper.Parse(s.StageType)
                 }).ToList();
             }
             var result = await _templateRepository.CreateAsync(entity);
             return await GetByIdAsync(result.Id);
         }
-        catch (Exception ex) { throw new Exception($"Create procedure template failed: {ex.Message}"); }
+        catch (DbUpdateException ex) { throw new Exception($"Create procedure template failed: {ex.InnerException?.Message ?? ex.Message}", ex); }
+        catch (Exception ex) { throw new Exception($"Create procedure template failed: {ex.InnerException?.Message ?? ex.Message}"); }
     }
 
     public async Task<ProcedureTemplateResponseDto?> GetByIdAsync(Guid id)
@@ -570,7 +602,8 @@ public class ProcedureTemplateService : IProcedureTemplateService
             Steps = entity.ProcedureTemplateSteps?.Select(s => new ProcedureTemplateStepResponseDto
             {
                 Id = s.Id, StepOrder = s.StepOrder, Title = s.Title, Instruction = s.Instruction,
-                ExpectedDurationDays = s.ExpectedDurationDays, RequiredSkillDescription = s.RequiredSkillDescription
+                ExpectedDurationDays = s.ExpectedDurationDays, RequiredSkillDescription = s.RequiredSkillDescription,
+                StageType = s.StageType.ToString()
             }).ToList() ?? new()
         };
     }
