@@ -14,4 +14,5 @@ public interface IExperimentRequestService
     Task<List<ExperimentRequestResponseDto>> GetByStatusAsync(string status);
     Task<RequestReviewResponseDto?> ReviewAsync(Guid requestId, ReviewExperimentRequestDto dto, Guid reviewerId);
     Task<bool> DeleteAsync(Guid id);
+    Task<ResourceValidationResultDto?> ValidateResourcesAsync(Guid requestId);
 }

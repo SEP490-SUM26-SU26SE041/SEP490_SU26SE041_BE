@@ -1,4 +1,5 @@
 using M = SmartFarmSEP490.Model;
+using SmartFarmSEP490.Model.DTOs;
 
 namespace SmartFarmSEP490.Repository.Interfaces.Farms;
 
@@ -12,4 +13,5 @@ public interface IFarmRepository
     Task<M.Farm> CreateAsync(M.Farm entity);
     Task UpdateAsync(M.Farm entity);
     Task DeleteAsync(Guid id);
+    Task<FarmResourceSummaryDto?> GetFarmResourceSummaryAsync(Guid farmId);
 }

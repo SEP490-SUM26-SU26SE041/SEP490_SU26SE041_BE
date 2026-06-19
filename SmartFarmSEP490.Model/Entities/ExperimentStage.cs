@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using SmartFarmSEP490.Model.Enums;
 
 namespace SmartFarmSEP490.Model;
 
@@ -22,6 +23,8 @@ public partial class ExperimentStage
     public string? ResultSummary { get; set; }
 
     public string? ResultData { get; set; }
+
+    public ExperimentStageType StageType { get; set; } = ExperimentStageType.Other;
 
     public DateTime CreatedAt { get; set; }
 

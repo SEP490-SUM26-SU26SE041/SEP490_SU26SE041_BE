@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using SmartFarmSEP490.Model;
+using SmartFarmSEP490.Model.Enums;
 using Task = SmartFarmSEP490.Model.Task;
 
 namespace SmartFarmSEP490.Repository.DbContexts;
@@ -507,6 +508,7 @@ public partial class SmartFarmDbContext : DbContext
                 .HasColumnType("timestamp without time zone");
             entity.Property(e => e.ResultData).HasColumnType("jsonb");
             entity.Property(e => e.StageName).HasMaxLength(100);
+            entity.Property(e => e.StageType).HasColumnType("ExperimentStageType");
             entity.Property(e => e.UpdatedAt)
                 .HasDefaultValueSql("now()")
                 .HasColumnType("timestamp without time zone");
@@ -743,6 +745,7 @@ public partial class SmartFarmDbContext : DbContext
 
             entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
             entity.Property(e => e.Title).HasMaxLength(150);
+            entity.Property(e => e.StageType).HasColumnType("ExperimentStageType");
 
             entity.HasOne(d => d.Template).WithMany(p => p.ProcedureTemplateSteps)
                 .HasForeignKey(d => d.TemplateId)

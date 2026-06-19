@@ -2,6 +2,9 @@ using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Npgsql;
+using Npgsql.NameTranslation;
+using SmartFarmSEP490.Model.Enums;
 using SmartFarmSEP490.Repository.DbContexts;
 using SmartFarmSEP490.Repository.Interfaces.Areas;
 using SmartFarmSEP490.Repository.Interfaces.Auth;
@@ -64,8 +67,13 @@ AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 // Prevent JWT handler from auto-mapping short claim names to long URIs
 System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler.DefaultMapInboundClaims = false;
 
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")!;
+var dataSourceBuilder = new NpgsqlDataSourceBuilder(connectionString);
+dataSourceBuilder.MapEnum<ExperimentStageType>("ExperimentStageType", new NpgsqlNullNameTranslator());
+var dataSource = dataSourceBuilder.Build();
+
 builder.Services.AddDbContext<SmartFarmDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseNpgsql(dataSource));
 
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IAuthService, AuthService>();
@@ -218,16 +226,11 @@ try
 
     app.Use(async (context, next) =>
     {
-        try
-        {
-            await next();
-        }
+        try { await next(); }
         catch (Exception ex)
         {
             Console.WriteLine($"[REQUEST ERROR] {context.Request.Method} {context.Request.Path}");
-            Console.WriteLine($"[REQUEST ERROR] Message: {ex.Message}");
-            Console.WriteLine($"[REQUEST ERROR] Inner: {ex.InnerException?.Message}");
-            Console.WriteLine($"[REQUEST ERROR] Stack: {ex.StackTrace}");
+            Console.WriteLine($"[REQUEST ERROR] {ex.GetType().Name}: {ex.Message}");
             throw;
         }
     });
@@ -244,8 +247,6 @@ catch (Exception ex)
 {
     Console.WriteLine($"[CRITICAL ERROR] Application failed to start: {ex.Message}");
     if (ex.InnerException != null)
-    {
         Console.WriteLine($"[INNER EXCEPTION]: {ex.InnerException.Message}");
-    }
     throw;
 }

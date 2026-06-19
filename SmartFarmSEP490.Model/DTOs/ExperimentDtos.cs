@@ -63,6 +63,7 @@ public class CreateExperimentStageDto
     public string? Objective { get; set; }
     public DateOnly? StartDate { get; set; }
     public DateOnly? EndDate { get; set; }
+    public string? StageType { get; set; }
 }
 
 public class UpdateExperimentStageDto
@@ -74,6 +75,7 @@ public class UpdateExperimentStageDto
     public DateOnly? EndDate { get; set; }
     public string? ResultSummary { get; set; }
     public string? ResultData { get; set; }
+    public string? StageType { get; set; }
 }
 
 public class ExperimentStageResponseDto
@@ -88,6 +90,7 @@ public class ExperimentStageResponseDto
     public string? ResultData { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
+    public string? StageType { get; set; }
 }
 
 // ============ ExperimentGroup DTOs ============
@@ -185,6 +188,17 @@ public class CreateProcedureTemplateStepDto
     public string Instruction { get; set; } = string.Empty;
     public int? ExpectedDurationDays { get; set; }
     public string? RequiredSkillDescription { get; set; }
+    public string? StageType { get; set; }
+}
+
+public class UpdateProcedureTemplateStepDto
+{
+    public int? StepOrder { get; set; }
+    public string? Title { get; set; }
+    public string? Instruction { get; set; }
+    public int? ExpectedDurationDays { get; set; }
+    public string? RequiredSkillDescription { get; set; }
+    public string? StageType { get; set; }
 }
 
 public class ProcedureTemplateResponseDto
@@ -207,6 +221,7 @@ public class ProcedureTemplateStepResponseDto
     public string Instruction { get; set; } = string.Empty;
     public int? ExpectedDurationDays { get; set; }
     public string? RequiredSkillDescription { get; set; }
+    public string? StageType { get; set; }
 }
 
 // ============ CareSchedule DTOs ============
@@ -247,4 +262,11 @@ public class CareScheduleResponseDto
     public string? ExperimentStageName { get; set; }
     public Guid? BatchId { get; set; }
     public string? BatchCode { get; set; }
+}
+
+// ============ Experiment Status DTO ============
+
+public class UpdateExperimentStatusDto
+{
+    public string Status { get; set; } = string.Empty;
 }

@@ -11,6 +11,7 @@ public interface IExperimentRepository
     Task<List<M.Experiment>> GetByFarmAsync(Guid farmId);
     Task<M.Experiment?> GetByCodeAsync(string code);
     Task<M.Experiment> CreateAsync(M.Experiment entity);
+    Task<M.Experiment> CreateWithStagesAsync(M.Experiment entity, IEnumerable<M.ExperimentStage> stages);
     Task UpdateAsync(M.Experiment entity);
     Task DeleteAsync(Guid id);
 }
