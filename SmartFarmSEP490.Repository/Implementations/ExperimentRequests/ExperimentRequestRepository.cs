@@ -17,7 +17,7 @@ public class ExperimentRequestRepository : IExperimentRequestRepository
         await _context.ExperimentRequests
             .Include(r => r.Researcher).Include(r => r.Farm)
             .Include(r => r.CropVariety).Include(r => r.ProcedureTemplate)
-            .Include(r => r.RequestReviews).ThenInclude(rr => rr.Reviewer)
+            .Include(r => r.RequestReviews).ThenInclude(rr => rr.Reviewer).ThenInclude(u => u.UserRoles).ThenInclude(ur => ur.Role)
             .FirstOrDefaultAsync(r => r.Id == id);
 
     public async Task<List<M.ExperimentRequest>> GetAllAsync() =>
@@ -34,7 +34,17 @@ public class ExperimentRequestRepository : IExperimentRequestRepository
 
     public async Task<List<M.ExperimentRequest>> GetByStatusAsync(string status) =>
         await _context.ExperimentRequests.Include(r => r.Researcher).Include(r => r.Farm)
-            .Where(r => r.Status == status).OrderByDescending(r => r.CreatedAt).ToListAsync();
+            .Where(r => r.Status == Enum.Parse<M.Enums.RequestStatus>(status)).OrderByDescending(r => r.CreatedAt).ToListAsync();
+
+    public async Task<List<M.ExperimentRequest>> GetByManagerAsync(Guid managerId, M.Enums.RequestStatus? status) =>
+        await _context.ExperimentRequests
+            .Include(r => r.Researcher).Include(r => r.Farm)
+            .Include(r => r.CropVariety).Include(r => r.ProcedureTemplate)
+            .Include(r => r.RequestReviews).ThenInclude(rr => rr.Reviewer).ThenInclude(u => u.UserRoles).ThenInclude(ur => ur.Role)
+            .Where(r => r.Farm!.ManagerId == managerId)
+            .Where(r => status == null || r.Status == status)
+            .OrderByDescending(r => r.CreatedAt)
+            .ToListAsync();
 
     public async Task<M.ExperimentRequest> CreateAsync(M.ExperimentRequest entity)
     {

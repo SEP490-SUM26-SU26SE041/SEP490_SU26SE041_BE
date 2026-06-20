@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SmartFarmSEP490.Model.DTOs;
+using SmartFarmSEP490.Model.Enums;
 using SmartFarmSEP490.Repository.Interfaces.Farms;
 using SmartFarmSEP490.Service.Interfaces.ExperimentRequests;
 
@@ -189,9 +190,6 @@ public class ExperimentRequestsController : ControllerBase
         if (role != "Manager")
             return StatusCode(403, new { error = "Only Manager can review experiment requests" });
 
-        if (dto.Result != "Approved" && dto.Result != "Rejected")
-            return BadRequest(new { error = "Result must be 'Approved' or 'Rejected'" });
-
         var existing = await _service.GetByIdAsync(id);
         if (existing == null) return NotFound();
 
@@ -207,6 +205,31 @@ public class ExperimentRequestsController : ControllerBase
 
         var result = await _service.ReviewAsync(id, dto, userId);
         return result == null ? StatusCode(500, new { error = "Review failed" }) : Ok(result);
+    }
+
+    // ============ Manager: inbox of requests from researchers ============
+
+    [HttpGet("manager/inbox")]
+    public async Task<IActionResult> ManagerInbox([FromQuery] string? status)
+    {
+        var userId = GetUserId();
+        var role = GetRole();
+        if (role != "Manager")
+            return StatusCode(403, new { error = "Only Manager can access this inbox" });
+
+        RequestStatus? statusFilter = null;
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            if (!Enum.TryParse<RequestStatus>(status, ignoreCase: true, out var parsed))
+                return BadRequest(new
+                {
+                    error = $"Invalid status '{status}'. Allowed: Pending, Approved, Rejected, Cancelled (or omit to return all)"
+                });
+            statusFilter = parsed;
+        }
+
+        var requests = await _service.GetByManagerAsync(userId, statusFilter);
+        return Ok(requests);
     }
 
     public class StatusUpdateDto

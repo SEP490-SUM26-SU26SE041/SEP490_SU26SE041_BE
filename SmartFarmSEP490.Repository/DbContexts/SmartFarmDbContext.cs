@@ -375,8 +375,8 @@ public partial class SmartFarmDbContext : DbContext
                 .HasConstraintName("Experiments_ResearcherId_fkey");
 
             entity.Property(e => e.Status)
-                .HasMaxLength(20)
-                .HasDefaultValueSql("'Draft'::character varying");
+                .HasColumnType("ExperimentStatus")
+                .HasDefaultValueSql("'Draft'::\"ExperimentStatus\"");
         });
 
         modelBuilder.Entity<ExperimentBedAssignment>(entity =>
@@ -490,8 +490,8 @@ public partial class SmartFarmDbContext : DbContext
                 .HasConstraintName("ExperimentRequests_ResearcherId_fkey");
 
             entity.Property(e => e.Status)
-                .HasMaxLength(20)
-                .HasDefaultValueSql("'Pending'::character varying");
+                .HasColumnType("RequestStatus")
+                .HasDefaultValueSql("'Pending'::\"RequestStatus\"");
         });
 
         modelBuilder.Entity<ExperimentStage>(entity =>
@@ -759,6 +759,7 @@ public partial class SmartFarmDbContext : DbContext
             entity.HasIndex(e => e.RequestId, "IX_RequestReviews_RequestId");
 
             entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
+            entity.Property(e => e.Result).HasColumnType("ReviewResult");
             entity.Property(e => e.ReviewedAt)
                 .HasDefaultValueSql("now()")
                 .HasColumnType("timestamp without time zone");

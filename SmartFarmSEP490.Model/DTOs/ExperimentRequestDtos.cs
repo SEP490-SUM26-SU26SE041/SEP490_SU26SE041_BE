@@ -1,5 +1,7 @@
 namespace SmartFarmSEP490.Model.DTOs;
 
+using SmartFarmSEP490.Model.Enums;
+
 // ============ ExperimentRequest DTOs ============
 
 public class CreateExperimentRequestDto
@@ -27,7 +29,7 @@ public class UpdateExperimentRequestDto
 
 public class ReviewExperimentRequestDto
 {
-    public string Result { get; set; } = string.Empty; // "Approved" or "Rejected"
+    public ReviewResult Result { get; set; } = ReviewResult.Approved;
     public string? Comment { get; set; }
 }
 
@@ -57,10 +59,22 @@ public class RequestReviewResponseDto
 {
     public Guid Id { get; set; }
     public Guid ReviewerId { get; set; }
-    public string? ReviewerName { get; set; }
+    public ReviewerInfoDto? Reviewer { get; set; }
     public string? Comment { get; set; }
     public string Result { get; set; } = string.Empty;
     public DateTime ReviewedAt { get; set; }
+}
+
+public class ReviewerInfoDto
+{
+    public Guid Id { get; set; }
+    public string? FullName { get; set; }
+    public string? Email { get; set; }
+    public string? Phone { get; set; }
+    public string? ProfileDescription { get; set; }
+    public bool? IsActive { get; set; }
+    public DateTime? CreatedAt { get; set; }
+    public List<string>? Roles { get; set; }
 }
 
 public class FarmResourceSummaryDto
