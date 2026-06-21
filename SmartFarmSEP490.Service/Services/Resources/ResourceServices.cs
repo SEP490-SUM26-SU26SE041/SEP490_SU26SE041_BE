@@ -1,6 +1,7 @@
 using M = SmartFarmSEP490.Model;
 using Microsoft.EntityFrameworkCore;
 using SmartFarmSEP490.Model.DTOs;
+using SmartFarmSEP490.Model.Enums;
 using SmartFarmSEP490.Repository.Interfaces.Areas;
 using SmartFarmSEP490.Repository.Interfaces.Batches;
 using SmartFarmSEP490.Repository.Interfaces.Beds;
@@ -145,7 +146,8 @@ public class AreaService : SvcInterfaces.IAreaService
                 AreaCode = dto.AreaCode,
                 AreaName = dto.AreaName,
                 EnvironmentType = dto.EnvironmentType,
-                TotalArea = dto.TotalArea
+                TotalArea = dto.TotalArea,
+                Status = dto.Status
             };
             var result = await _areaRepository.CreateAsync(entity);
             return await GetByIdAsync(result.Id);
@@ -164,6 +166,7 @@ public class AreaService : SvcInterfaces.IAreaService
         if (dto.AreaName != null) entity.AreaName = dto.AreaName;
         if (dto.EnvironmentType != null) entity.EnvironmentType = dto.EnvironmentType;
         if (dto.TotalArea.HasValue) entity.TotalArea = dto.TotalArea;
+        if (dto.Status.HasValue) entity.Status = dto.Status.Value;
         await _areaRepository.UpdateAsync(entity);
         return await GetByIdAsync(id);
     }
@@ -197,6 +200,7 @@ public class AreaService : SvcInterfaces.IAreaService
         AreaName = a.AreaName,
         EnvironmentType = a.EnvironmentType,
         TotalArea = a.TotalArea,
+        Status = a.Status,
         CreatedAt = a.CreatedAt,
         UpdatedAt = a.UpdatedAt,
         Beds = (a.Beds ?? new List<M.Bed>())

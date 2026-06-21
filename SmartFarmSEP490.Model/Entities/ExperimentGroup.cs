@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using SmartFarmSEP490.Model.Enums;
 
 namespace SmartFarmSEP490.Model;
 
@@ -12,6 +13,8 @@ public partial class ExperimentGroup
     public string GroupName { get; set; } = null!;
 
     public string? TreatmentDescription { get; set; }
+
+    public GroupType GroupType { get; set; } = GroupType.Control;
 
     public DateTime CreatedAt { get; set; }
 

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using SmartFarmSEP490.Model.Enums;
 
 namespace SmartFarmSEP490.Model;
 
@@ -22,6 +23,10 @@ public partial class Task
     public string Title { get; set; } = null!;
 
     public string? Description { get; set; }
+
+    public TaskType Type { get; set; } = TaskType.Other;
+
+    public Enums.TaskStatus Status { get; set; } = Enums.TaskStatus.Pending;
 
     public string? RequiredSkillDescription { get; set; }
 
