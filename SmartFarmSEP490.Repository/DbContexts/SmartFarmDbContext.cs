@@ -882,9 +882,9 @@ public partial class SmartFarmDbContext : DbContext
                 .HasDefaultValueSql("now()")
                 .HasColumnType("timestamp without time zone");
             entity.Property(e => e.DueDate).HasColumnType("timestamp without time zone");
-            entity.Property(e => e.Status).HasColumnType("TaskStatus").HasConversion<string>();
+            entity.Property(e => e.Status).HasColumnName("Status").HasColumnType("TaskStatus");
             entity.Property(e => e.Title).HasMaxLength(150);
-            entity.Property(e => e.Type).HasColumnType("TaskType").HasConversion<string>();
+            entity.Property(e => e.Type).HasColumnName("TaskType").HasColumnType("TaskType");
             entity.Property(e => e.UpdatedAt)
                 .HasDefaultValueSql("now()")
                 .HasColumnType("timestamp without time zone");
@@ -930,7 +930,7 @@ public partial class SmartFarmDbContext : DbContext
                 .HasDefaultValueSql("now()")
                 .HasColumnType("timestamp without time zone");
             entity.Property(e => e.EndedAt).HasColumnType("timestamp without time zone");
-            entity.Property(e => e.Status).HasColumnType("TaskAssignmentStatus").HasConversion<string>();
+            entity.Property(e => e.Status).HasColumnType("TaskAssignmentStatus");
 
             entity.HasOne(d => d.AssignedByNavigation).WithMany(p => p.TaskAssignmentAssignedByNavigations)
                 .HasForeignKey(d => d.AssignedBy)

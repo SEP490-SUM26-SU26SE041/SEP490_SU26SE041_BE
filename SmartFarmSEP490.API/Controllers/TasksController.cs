@@ -23,7 +23,9 @@ public class TasksController : ControllerBase
         _experimentRepository = experimentRepository;
     }
 
-    private Guid GetUserId() => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+    private Guid GetUserId() => Guid.Parse(User.FindFirstValue(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)
+        ?? User.FindFirstValue(ClaimTypes.NameIdentifier)
+        ?? throw new UnauthorizedAccessException("User identifier claim not found."));
     private bool IsResearcher() => User.FindFirstValue(ClaimTypes.Role) == "Researcher";
 
     private async Task<bool> IsExperimentOwnerAsync(Guid experimentId)
@@ -47,6 +49,7 @@ public class TasksController : ControllerBase
     {
         if (!ModelState.IsValid) return BadRequest(ModelState);
         if (!IsResearcher()) return Forbid();
+        if (!await IsExperimentOwnerAsync(dto.ExperimentId)) return Forbid();
 
         var result = await _taskService.CreateAsync(dto, GetUserId());
         return result == null ? BadRequest("Experiment not found or invalid data.") : CreatedAtAction(nameof(GetTaskById), new { id = result.Id }, result);
@@ -83,12 +86,9 @@ public class TasksController : ControllerBase
     public async Task<IActionResult> UpdateTask(Guid id, [FromBody] UpdateTaskDto dto)
     {
         if (!ModelState.IsValid) return BadRequest(ModelState);
-        if (!await IsExperimentOwnerAsync(id))
-        {
-            var task = await _taskService.GetByIdAsync(id);
-            if (task != null) return Forbid();
-            return NotFound();
-        }
+        var task = await _taskService.GetByIdAsync(id);
+        if (task == null) return NotFound();
+        if (!await IsExperimentOwnerAsync(task.ExperimentId)) return Forbid();
 
         var result = await _taskService.UpdateAsync(id, dto, GetUserId());
         return result == null ? NotFound() : Ok(result);
@@ -113,7 +113,7 @@ public class TasksController : ControllerBase
         var task = await _taskService.GetByIdAsync(id);
         if (task == null) return NotFound();
 
-        var hasAccess = IsResearcher() || task.AssignedTo == GetUserId();
+        var hasAccess = IsResearcher() || (task.AssignedTo.HasValue && task.AssignedTo.Value == GetUserId());
         if (!hasAccess) return Forbid();
 
         var result = await _taskService.UpdateTaskStatusAsync(id, dto.Status, GetUserId());

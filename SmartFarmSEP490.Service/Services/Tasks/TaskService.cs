@@ -54,12 +54,12 @@ public class TaskService : ITaskService
             BatchId = dto.BatchId,
             CareScheduleId = dto.CareScheduleId,
             CreatedBy = createdById,
-            TaskType = dto.TaskType,
+            Type = Enum.TryParse<SmartFarmSEP490.Model.Enums.TaskType>(dto.TaskType, ignoreCase: true, out var tt) ? tt : SmartFarmSEP490.Model.Enums.TaskType.Other,
             Title = dto.Title,
             Description = dto.Description,
             RequiredSkillDescription = dto.RequiredSkillDescription,
             DueDate = dto.DueDate,
-            Status = "Pending",
+            Status = SmartFarmSEP490.Model.Enums.TaskStatus.Pending,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -106,12 +106,12 @@ public class TaskService : ITaskService
         if (dto.ExperimentStageId != null) task.ExperimentStageId = dto.ExperimentStageId;
         if (dto.BatchId != null) task.BatchId = dto.BatchId;
         if (dto.CareScheduleId != null) task.CareScheduleId = dto.CareScheduleId;
-        if (!string.IsNullOrEmpty(dto.TaskType)) task.TaskType = dto.TaskType;
+        if (!string.IsNullOrEmpty(dto.TaskType)) task.Type = Enum.TryParse<SmartFarmSEP490.Model.Enums.TaskType>(dto.TaskType, ignoreCase: true, out var tt) ? tt : task.Type;
         if (!string.IsNullOrEmpty(dto.Title)) task.Title = dto.Title;
         if (dto.Description != null) task.Description = dto.Description;
         if (dto.RequiredSkillDescription != null) task.RequiredSkillDescription = dto.RequiredSkillDescription;
         if (dto.DueDate.HasValue) task.DueDate = dto.DueDate;
-        if (!string.IsNullOrEmpty(dto.Status)) task.Status = dto.Status;
+        if (!string.IsNullOrEmpty(dto.Status)) task.Status = Enum.TryParse<SmartFarmSEP490.Model.Enums.TaskStatus>(dto.Status, ignoreCase: true, out var ts) ? ts : task.Status;
         task.UpdatedAt = DateTime.UtcNow;
 
         await _taskRepository.UpdateAsync(task);
@@ -146,7 +146,7 @@ public class TaskService : ITaskService
             TaskId = dto.TaskId,
             AssigneeId = dto.AssigneeId,
             AssignedBy = assignedById,
-            Status = "Assigned",
+            Status = SmartFarmSEP490.Model.Enums.TaskAssignmentStatus.Assigned,
             Reason = dto.Reason,
             AssignedAt = DateTime.UtcNow
         };
@@ -165,7 +165,7 @@ public class TaskService : ITaskService
         var task = await _taskRepository.GetByIdAsync(dto.TaskId);
         if (task == null) return null!;
 
-        var newAssignee = await _userRepository.GetUserByIdAsync(dto.AssigneeId);
+        var newAssignee = await _userRepository.GetUserByIdAsync(dto.NewAssigneeId);
         if (newAssignee == null) return null!;
 
         var isAllowedRole = newAssignee.UserRoles.Any(ur => AssignableRoles.Contains(ur.Role.RoleName));
@@ -174,25 +174,25 @@ public class TaskService : ITaskService
         var existingAssignments = await _assignmentRepository.GetByTaskIdAsync(dto.TaskId);
         foreach (var existing in existingAssignments.Where(a => a.EndedAt == null))
         {
-            existing.Status = "Reassigned";
+            existing.Status = SmartFarmSEP490.Model.Enums.TaskAssignmentStatus.Reassigned;
             existing.EndedAt = DateTime.UtcNow;
             await _assignmentRepository.UpdateAsync(existing);
         }
 
-        var newAssignment = new TaskAssignmentEntity
+        var newAssignment = new SmartFarmSEP490.Model.TaskAssignment
         {
             Id = Guid.NewGuid(),
             TaskId = dto.TaskId,
-            AssigneeId = dto.AssigneeId,
+            AssigneeId = dto.NewAssigneeId,
             AssignedBy = reassignedById,
-            Status = "Assigned",
+            Status = SmartFarmSEP490.Model.Enums.TaskAssignmentStatus.Assigned,
             Reason = dto.Reason,
             AssignedAt = DateTime.UtcNow
         };
 
         await _assignmentRepository.AddAsync(newAssignment);
 
-        task.AssignedTo = dto.AssigneeId;
+        task.AssignedTo = dto.NewAssigneeId;
         task.UpdatedAt = DateTime.UtcNow;
         await _taskRepository.UpdateAsync(task);
 
@@ -204,7 +204,7 @@ public class TaskService : ITaskService
         var task = await _taskRepository.GetByIdAsync(id);
         if (task == null) return null!;
 
-        task.Status = status;
+        task.Status = Enum.TryParse<SmartFarmSEP490.Model.Enums.TaskStatus>(status, ignoreCase: true, out var ts) ? ts : task.Status;
         task.UpdatedAt = DateTime.UtcNow;
         await _taskRepository.UpdateAsync(task);
 
@@ -216,7 +216,7 @@ public class TaskService : ITaskService
         var assignment = await _assignmentRepository.GetByIdAsync(dto.AssignmentId);
         if (assignment == null) return null!;
 
-        assignment.Status = dto.Status;
+        assignment.Status = Enum.TryParse<SmartFarmSEP490.Model.Enums.TaskAssignmentStatus>(dto.Status, ignoreCase: true, out var as_) ? as_ : assignment.Status;
         if (dto.Status == "Completed" || dto.Status == "Cancelled" || dto.Status == "Resigned")
         {
             assignment.EndedAt = DateTime.UtcNow;
@@ -228,7 +228,7 @@ public class TaskService : ITaskService
             var task = await _taskRepository.GetByIdAsync(assignment.TaskId);
             if (task != null)
             {
-                task.Status = "Completed";
+                task.Status = SmartFarmSEP490.Model.Enums.TaskStatus.Completed;
                 task.UpdatedAt = DateTime.UtcNow;
                 await _taskRepository.UpdateAsync(task);
             }
@@ -341,10 +341,10 @@ public class TaskService : ITaskService
             Id = task.Id,
             Title = task.Title,
             Description = task.Description,
-            TaskType = task.TaskType,
+            TaskType = task.Type.ToString(),
             RequiredSkillDescription = task.RequiredSkillDescription,
             DueDate = task.DueDate,
-            Status = task.Status,
+            Status = task.Status.ToString(),
             CreatedAt = task.CreatedAt,
             UpdatedAt = task.UpdatedAt,
             ExperimentId = task.ExperimentId,
@@ -390,7 +390,7 @@ public class TaskService : ITaskService
             AssignedBy = assignment.AssignedBy,
             AssignedByName = assignment.AssignedByNavigation?.FullName,
             Reason = assignment.Reason,
-            Status = assignment.Status,
+            Status = assignment.Status.ToString(),
             AssignedAt = assignment.AssignedAt,
             EndedAt = assignment.EndedAt
         };
