@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using SmartFarmSEP490.Model.Enums;
 
 namespace SmartFarmSEP490.Model;
 
@@ -14,6 +15,8 @@ public partial class AitaskAssignmentSuggestion
     public decimal? MatchScore { get; set; }
 
     public string? Reason { get; set; }
+
+    public AIReviewStatus ReviewStatus { get; set; } = AIReviewStatus.Suggested;
 
     public Guid? ReviewedBy { get; set; }
 

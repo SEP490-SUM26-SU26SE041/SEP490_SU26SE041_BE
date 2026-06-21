@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using SmartFarmSEP490.Model.Enums;
 
 namespace SmartFarmSEP490.Model;
 
@@ -16,6 +17,8 @@ public partial class Alert
     public string Title { get; set; } = null!;
 
     public string? Message { get; set; }
+
+    public AlertSeverity Severity { get; set; } = AlertSeverity.Low;
 
     public bool IsResolved { get; set; }
 

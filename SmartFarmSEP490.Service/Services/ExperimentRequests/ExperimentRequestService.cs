@@ -1,5 +1,8 @@
 using M = SmartFarmSEP490.Model;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using SmartFarmSEP490.Model.DTOs;
+using SmartFarmSEP490.Model.Enums;
 using SmartFarmSEP490.Repository.Interfaces.ExperimentRequests;
 using SmartFarmSEP490.Repository.Interfaces.Farms;
 using SmartFarmSEP490.Service.Interfaces.ExperimentRequests;
@@ -11,15 +14,18 @@ public class ExperimentRequestService : IExperimentRequestService
     private readonly IExperimentRequestRepository _requestRepository;
     private readonly IRequestReviewRepository _reviewRepository;
     private readonly IFarmRepository _farmRepository;
+    private readonly ILogger<ExperimentRequestService> _logger;
 
     public ExperimentRequestService(
         IExperimentRequestRepository requestRepository,
         IRequestReviewRepository reviewRepository,
-        IFarmRepository farmRepository)
+        IFarmRepository farmRepository,
+        ILogger<ExperimentRequestService> logger)
     {
         _requestRepository = requestRepository;
         _reviewRepository = reviewRepository;
         _farmRepository = farmRepository;
+        _logger = logger;
     }
 
     public async Task<ExperimentRequestResponseDto?> CreateAsync(CreateExperimentRequestDto dto, Guid researcherId)
@@ -37,12 +43,19 @@ public class ExperimentRequestService : IExperimentRequestService
                 ExpectedStartDate = dto.ExpectedStartDate,
                 ExpectedEndDate = dto.ExpectedEndDate,
                 MonitoringPlan = dto.MonitoringPlan,
-                Status = "Pending"
+                Status = Enum.Parse<RequestStatus>("Pending")
             };
             var result = await _requestRepository.CreateAsync(entity);
             return await GetByIdAsync(result.Id);
         }
-        catch (Exception ex) { throw new Exception($"Create experiment request failed: {ex.Message}"); }
+        catch (DbUpdateException ex)
+        {
+            var pg = ex.InnerException as Npgsql.PostgresException;
+            _logger.LogError(ex,
+                "Create experiment request failed. SqlState={SqlState} Detail={Detail} WhereFragment={Hint}",
+                pg?.SqlState, pg?.Detail, pg?.Where);
+            throw;
+        }
     }
 
     public async Task<ExperimentRequestResponseDto?> UpdateAsync(Guid id, UpdateExperimentRequestDto dto, Guid researcherId)
@@ -61,7 +74,14 @@ public class ExperimentRequestService : IExperimentRequestService
             await _requestRepository.UpdateAsync(entity);
             return await GetByIdAsync(id);
         }
-        catch (Exception ex) { throw new Exception($"Update experiment request failed: {ex.Message}"); }
+        catch (DbUpdateException ex)
+        {
+            var pg = ex.InnerException as Npgsql.PostgresException;
+            _logger.LogError(ex,
+                "Update experiment request failed. SqlState={SqlState} Detail={Detail}",
+                pg?.SqlState, pg?.Detail);
+            throw;
+        }
     }
 
     public async Task<ExperimentRequestResponseDto?> UpdateStatusAsync(Guid id, string status)
@@ -70,11 +90,18 @@ public class ExperimentRequestService : IExperimentRequestService
         {
             var entity = await _requestRepository.GetByIdAsync(id);
             if (entity == null) return null;
-            entity.Status = status;
+            entity.Status = Enum.Parse<RequestStatus>(status);
             await _requestRepository.UpdateAsync(entity);
             return await GetByIdAsync(id);
         }
-        catch (Exception ex) { throw new Exception($"Update experiment request status failed: {ex.Message}"); }
+        catch (DbUpdateException ex)
+        {
+            var pg = ex.InnerException as Npgsql.PostgresException;
+            _logger.LogError(ex,
+                "Update experiment request status failed. SqlState={SqlState}",
+                pg?.SqlState);
+            throw;
+        }
     }
 
     public async Task<ExperimentRequestResponseDto?> GetByIdAsync(Guid id)
@@ -128,6 +155,16 @@ public class ExperimentRequestService : IExperimentRequestService
         catch (Exception ex) { throw new Exception($"Get experiment requests by status failed: {ex.Message}"); }
     }
 
+    public async Task<List<ExperimentRequestResponseDto>> GetByManagerAsync(Guid managerId, RequestStatus? status)
+    {
+        try
+        {
+            var entities = await _requestRepository.GetByManagerAsync(managerId, status);
+            return entities.Select(MapToResponseDto).ToList();
+        }
+        catch (Exception ex) { throw new Exception($"Get experiment requests by manager failed: {ex.Message}"); }
+    }
+
     public async Task<RequestReviewResponseDto?> ReviewAsync(Guid requestId, ReviewExperimentRequestDto dto, Guid reviewerId)
     {
         try
@@ -140,28 +177,33 @@ public class ExperimentRequestService : IExperimentRequestService
                 Result = dto.Result,
                 ReviewedAt = DateTime.UtcNow
             };
-            var result = await _reviewRepository.CreateAsync(entity);
+            await _reviewRepository.CreateAsync(entity);
 
-            if (dto.Result == "Approved" || dto.Result == "Rejected")
+            // Map ReviewResult -> RequestStatus for parent request
+            var newRequestStatus = dto.Result == ReviewResult.Approved
+                ? RequestStatus.Approved
+                : RequestStatus.Rejected;
+            var request = await _requestRepository.GetByIdAsync(requestId);
+            if (request != null)
             {
-                var request = await _requestRepository.GetByIdAsync(requestId);
-                if (request != null)
-                {
-                    request.Status = dto.Result == "Approved" ? "Approved" : "Rejected";
-                    await _requestRepository.UpdateAsync(request);
-                }
+                request.Status = newRequestStatus;
+                await _requestRepository.UpdateAsync(request);
             }
 
-            return new RequestReviewResponseDto
-            {
-                Id = result.Id,
-                ReviewerId = result.ReviewerId,
-                Comment = result.Comment,
-                Result = result.Result,
-                ReviewedAt = result.ReviewedAt
-            };
+            // Reload the review list with full Reviewer (UserRoles -> Role) eagerly loaded
+            var reviews = await _reviewRepository.GetByRequestIdAsync(requestId);
+            var saved = reviews.FirstOrDefault(r => r.ReviewerId == reviewerId);
+            if (saved == null) return null;
+            return MapToReviewResponseDto(saved);
         }
-        catch (Exception ex) { throw new Exception($"Review experiment request failed: {ex.Message}"); }
+        catch (DbUpdateException ex)
+        {
+            var pg = ex.InnerException as Npgsql.PostgresException;
+            _logger.LogError(ex,
+                "Review experiment request failed. SqlState={SqlState} Detail={Detail}",
+                pg?.SqlState, pg?.Detail);
+            throw;
+        }
     }
 
     public async Task<bool> DeleteAsync(Guid id)
@@ -214,7 +256,7 @@ public class ExperimentRequestService : IExperimentRequestService
             Id = entity.Id,
             Title = entity.Title,
             Objective = entity.Objective,
-            Status = entity.Status,
+            Status = entity.Status.ToString(),
             ExpectedStartDate = entity.ExpectedStartDate,
             ExpectedEndDate = entity.ExpectedEndDate,
             MonitoringPlan = entity.MonitoringPlan,
@@ -228,15 +270,33 @@ public class ExperimentRequestService : IExperimentRequestService
             CropVarietyName = entity.CropVariety?.VarietyName,
             ProcedureTemplateId = entity.ProcedureTemplateId,
             ProcedureTemplateName = entity.ProcedureTemplate?.TemplateName,
-            Reviews = entity.RequestReviews?.Select(r => new RequestReviewResponseDto
+            Reviews = entity.RequestReviews?.Select(MapToReviewResponseDto).ToList() ?? new()
+        };
+    }
+
+    private static RequestReviewResponseDto MapToReviewResponseDto(M.RequestReview r)
+    {
+        return new RequestReviewResponseDto
+        {
+            Id = r.Id,
+            ReviewerId = r.ReviewerId,
+            Reviewer = r.Reviewer == null ? null : new ReviewerInfoDto
             {
-                Id = r.Id,
-                ReviewerId = r.ReviewerId,
-                ReviewerName = r.Reviewer?.FullName,
-                Comment = r.Comment,
-                Result = r.Result,
-                ReviewedAt = r.ReviewedAt
-            }).ToList() ?? new()
+                Id = r.Reviewer.Id,
+                FullName = r.Reviewer.FullName,
+                Email = r.Reviewer.Email,
+                Phone = r.Reviewer.Phone,
+                ProfileDescription = r.Reviewer.ProfileDescription,
+                IsActive = r.Reviewer.IsActive,
+                CreatedAt = r.Reviewer.CreatedAt,
+                Roles = r.Reviewer.UserRoles?
+                    .Where(ur => ur.Role != null)
+                    .Select(ur => ur.Role.RoleName)
+                    .ToList()
+            },
+            Comment = r.Comment,
+            Result = r.Result?.ToString() ?? string.Empty,
+            ReviewedAt = r.ReviewedAt
         };
     }
 }

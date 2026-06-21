@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using SmartFarmSEP490.Model.Enums;
 
 namespace SmartFarmSEP490.Model;
 
@@ -29,7 +30,7 @@ public partial class ExperimentRequest
 
     public DateTime UpdatedAt { get; set; }
 
-    public string Status { get; set; } = "Pending";
+    public RequestStatus Status { get; set; } = RequestStatus.Pending;
 
     public virtual CropVariety? CropVariety { get; set; }
 

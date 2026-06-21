@@ -21,7 +21,7 @@ public class RequestReviewRepository : IRequestReviewRepository
 
     public async Task<List<M.RequestReview>> GetByRequestIdAsync(Guid requestId) =>
         await _context.RequestReviews
-            .Include(rr => rr.Reviewer)
+            .Include(rr => rr.Reviewer).ThenInclude(u => u.UserRoles).ThenInclude(ur => ur.Role)
             .Where(rr => rr.RequestId == requestId)
             .OrderByDescending(rr => rr.ReviewedAt)
             .ToListAsync();

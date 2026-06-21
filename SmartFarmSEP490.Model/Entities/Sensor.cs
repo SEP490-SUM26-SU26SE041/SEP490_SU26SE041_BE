@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using SmartFarmSEP490.Model.Enums;
 
 namespace SmartFarmSEP490.Model;
 
@@ -10,6 +11,8 @@ public partial class Sensor
     public string SensorCode { get; set; } = null!;
 
     public string? Description { get; set; }
+
+    public SensorType SensorType { get; set; } = SensorType.Other;
 
     public DateTime CreatedAt { get; set; }
 

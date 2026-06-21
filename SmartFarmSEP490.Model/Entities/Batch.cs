@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using SmartFarmSEP490.Model.Enums;
 
 namespace SmartFarmSEP490.Model;
 
@@ -22,6 +23,8 @@ public partial class Batch
     public DateOnly? ExpectedHarvestDate { get; set; }
 
     public int? PlantCount { get; set; }
+
+    public BatchStatus Status { get; set; } = BatchStatus.Planned;
 
     public string? Notes { get; set; }
 
