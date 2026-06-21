@@ -9,7 +9,6 @@ using SmartFarmSEP490.Repository.Interfaces.Crops;
 using SmartFarmSEP490.Repository.Interfaces.ExperimentBedAssignments;
 using SmartFarmSEP490.Repository.Interfaces.Farms;
 using SvcInterfaces = SmartFarmSEP490.Service.Interfaces.Resources;
-using Task = System.Threading.Tasks.Task;
 
 namespace SmartFarmSEP490.Service.Services.Resources;
 

@@ -52,6 +52,10 @@ using SmartFarmSEP490.Repository.Interfaces.SystemLogs;
 using SmartFarmSEP490.Repository.Implementations.SystemLogs;
 using SmartFarmSEP490.Service.Interfaces.SystemLogs;
 using SmartFarmSEP490.Service.Services.SystemLogs;
+using SmartFarmSEP490.Repository.Interfaces.Tasks;
+using SmartFarmSEP490.Repository.Implementations.Tasks;
+using SmartFarmSEP490.Service.Interfaces.Tasks;
+using SmartFarmSEP490.Service.Services.Tasks;
 using SmartFarmSEP490.Repository.Interfaces.Notifications;
 using SmartFarmSEP490.Repository.Implementations.Notifications;
 using SmartFarmSEP490.Service.Interfaces.Notifications;
@@ -117,6 +121,11 @@ builder.Services.AddScoped<ISystemLogRepository, SystemLogRepository>();
 builder.Services.AddScoped<ISystemLogService, SystemLogService>();
 builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
+
+builder.Services.AddScoped<ITaskRepository, TaskRepository>();
+builder.Services.AddScoped<ITaskAssignmentRepository, TaskAssignmentRepository>();
+builder.Services.AddScoped<ITaskSkillRequirementRepository, TaskSkillRequirementRepository>();
+builder.Services.AddScoped<ITaskService, TaskService>();
 
 var jwtSettings = builder.Configuration.GetSection("Jwt");
 var key = Encoding.UTF8.GetBytes(jwtSettings["Key"]!);
