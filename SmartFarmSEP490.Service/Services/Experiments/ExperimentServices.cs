@@ -1,6 +1,7 @@
 using M = SmartFarmSEP490.Model;
 using Microsoft.EntityFrameworkCore;
 using SmartFarmSEP490.Model.DTOs;
+using SmartFarmSEP490.Model.Enums;
 using SmartFarmSEP490.Repository.Interfaces.CareSchedules;
 using SmartFarmSEP490.Repository.Interfaces.ExperimentDesigns;
 using SmartFarmSEP490.Repository.Interfaces.ExperimentGroups;
@@ -8,7 +9,6 @@ using SmartFarmSEP490.Repository.Interfaces.ExperimentStages;
 using SmartFarmSEP490.Repository.Interfaces.Experiments;
 using SmartFarmSEP490.Repository.Interfaces.MeasurementDefinitions;
 using SmartFarmSEP490.Repository.Interfaces.ProcedureTemplates;
-using SmartFarmSEP490.Service.Common;
 using SmartFarmSEP490.Service.Interfaces.Experiments;
 
 namespace SmartFarmSEP490.Service.Services.Experiments;
@@ -43,7 +43,7 @@ public class ExperimentService : IExperimentService
                 Hypothesis = dto.Hypothesis,
                 StartDate = dto.StartDate,
                 EndDate = dto.EndDate,
-                Status = "Draft"
+                Status = ExperimentStatus.Draft
             };
 
             if (dto.ProcedureTemplateId.HasValue)
@@ -84,7 +84,7 @@ public class ExperimentService : IExperimentService
             if (dto.Hypothesis != null) entity.Hypothesis = dto.Hypothesis;
             if (dto.StartDate.HasValue) entity.StartDate = dto.StartDate.Value;
             if (dto.EndDate.HasValue) entity.EndDate = dto.EndDate;
-            if (dto.Status != null) entity.Status = dto.Status;
+            if (dto.Status != null) entity.Status = Enum.Parse<ExperimentStatus>(dto.Status);
             await _experimentRepository.UpdateAsync(entity);
             return await GetByIdAsync(id);
         }
@@ -97,7 +97,7 @@ public class ExperimentService : IExperimentService
         {
             var entity = await _experimentRepository.GetByIdAsync(id);
             if (entity == null) return null;
-            entity.Status = status;
+            entity.Status = Enum.Parse<ExperimentStatus>(status);
             await _experimentRepository.UpdateAsync(entity);
             return await GetByIdAsync(id);
         }
@@ -166,7 +166,7 @@ public class ExperimentService : IExperimentService
             Title = entity.Title,
             Objective = entity.Objective,
             Hypothesis = entity.Hypothesis,
-            Status = entity.Status,
+            Status = entity.Status.ToString(),
             StartDate = entity.StartDate,
             EndDate = entity.EndDate,
             CreatedAt = entity.CreatedAt,
@@ -185,7 +185,7 @@ public class ExperimentService : IExperimentService
                 Id = s.Id, StageName = s.StageName, StageOrder = s.StageOrder,
                 Objective = s.Objective, StartDate = s.StartDate, EndDate = s.EndDate,
                 ResultSummary = s.ResultSummary, ResultData = s.ResultData,
-                CreatedAt = s.CreatedAt, UpdatedAt = s.UpdatedAt, StageType = s.StageType.ToString()
+                CreatedAt = s.CreatedAt, UpdatedAt = s.UpdatedAt, StageType = s.StageType
             }).ToList() ?? new(),
             Groups = entity.ExperimentGroups?.Select(g => new ExperimentGroupResponseDto
             {
@@ -228,7 +228,7 @@ public class ExperimentStageService : IExperimentStageService
                 Objective = dto.Objective,
                 StartDate = dto.StartDate,
                 EndDate = dto.EndDate,
-                StageType = StageTypeHelper.Parse(dto.StageType)
+                StageType = dto.StageType
             };
             var result = await _stageRepository.CreateAsync(entity);
             return MapToResponseDto(result);
@@ -249,7 +249,7 @@ public class ExperimentStageService : IExperimentStageService
             if (dto.EndDate.HasValue) entity.EndDate = dto.EndDate;
             if (dto.ResultSummary != null) entity.ResultSummary = dto.ResultSummary;
             if (dto.ResultData != null) entity.ResultData = dto.ResultData;
-            if (dto.StageType != null) entity.StageType = StageTypeHelper.Parse(dto.StageType);
+            if (dto.StageType != null) entity.StageType = dto.StageType.Value;
             await _stageRepository.UpdateAsync(entity);
             return MapToResponseDto(entity);
         }
@@ -285,7 +285,7 @@ public class ExperimentStageService : IExperimentStageService
             Id = entity.Id, StageName = entity.StageName, StageOrder = entity.StageOrder,
             Objective = entity.Objective, StartDate = entity.StartDate, EndDate = entity.EndDate,
             ResultSummary = entity.ResultSummary, ResultData = entity.ResultData,
-            CreatedAt = entity.CreatedAt, UpdatedAt = entity.UpdatedAt, StageType = entity.StageType.ToString()
+            CreatedAt = entity.CreatedAt, UpdatedAt = entity.UpdatedAt, StageType = entity.StageType
         };
     }
 }
@@ -539,7 +539,7 @@ public class ProcedureTemplateService : IProcedureTemplateService
                     Instruction = s.Instruction,
                     ExpectedDurationDays = s.ExpectedDurationDays,
                     RequiredSkillDescription = s.RequiredSkillDescription,
-                    StageType = StageTypeHelper.Parse(s.StageType)
+                    StageType = s.StageType ?? ExperimentStageType.Other
                 }).ToList();
             }
             var result = await _templateRepository.CreateAsync(entity);
@@ -603,7 +603,7 @@ public class ProcedureTemplateService : IProcedureTemplateService
             {
                 Id = s.Id, StepOrder = s.StepOrder, Title = s.Title, Instruction = s.Instruction,
                 ExpectedDurationDays = s.ExpectedDurationDays, RequiredSkillDescription = s.RequiredSkillDescription,
-                StageType = s.StageType.ToString()
+                StageType = s.StageType
             }).ToList() ?? new()
         };
     }

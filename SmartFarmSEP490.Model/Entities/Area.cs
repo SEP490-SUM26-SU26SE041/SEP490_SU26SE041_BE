@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using SmartFarmSEP490.Model.Enums;
 
 namespace SmartFarmSEP490.Model;
 
@@ -14,6 +15,8 @@ public partial class Area
     public string AreaName { get; set; } = null!;
 
     public string? EnvironmentType { get; set; }
+
+    public LocationStatus Status { get; set; } = LocationStatus.Available;
 
     public decimal? TotalArea { get; set; }
 

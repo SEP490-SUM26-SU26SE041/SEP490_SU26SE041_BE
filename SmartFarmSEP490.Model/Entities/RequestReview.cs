@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using SmartFarmSEP490.Model.Enums;
 
 namespace SmartFarmSEP490.Model;
 
@@ -13,7 +14,7 @@ public partial class RequestReview
 
     public string? Comment { get; set; }
 
-    public string? Result { get; set; }
+    public ReviewResult? Result { get; set; }
 
     public DateTime ReviewedAt { get; set; }
 

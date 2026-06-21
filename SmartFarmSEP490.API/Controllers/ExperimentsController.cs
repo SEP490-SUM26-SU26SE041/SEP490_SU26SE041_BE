@@ -191,6 +191,15 @@ public class ExperimentsController : ControllerBase
         return CreatedAtAction(nameof(GetStageById), new { experimentId, id = result.Id }, result);
     }
 
+    [HttpGet("{experimentId:guid}/stages/{id:guid}")]
+    public async Task<IActionResult> GetStageById(Guid experimentId, Guid id)
+    {
+        if (!await CanAccessExperimentAsync(experimentId)) return Forbid();
+        var list = await _stageService.GetByExperimentAsync(experimentId);
+        var result = list.FirstOrDefault(s => s.Id == id);
+        return result == null ? NotFound() : Ok(result);
+    }
+
     [HttpGet("{experimentId:guid}/stages")]
     public async Task<IActionResult> GetStagesByExperiment(Guid experimentId)
     {
@@ -219,14 +228,6 @@ public class ExperimentsController : ControllerBase
         return NoContent();
     }
 
-    private async Task<IActionResult> GetStageById(Guid experimentId, Guid id)
-    {
-        if (!await CanAccessExperimentAsync(experimentId)) return Forbid();
-        var list = await _stageService.GetByExperimentAsync(experimentId);
-        var result = list.FirstOrDefault(s => s.Id == id);
-        return result == null ? NotFound() : Ok(result);
-    }
-
     // ========== Experiment Groups ==========
 
     [HttpPost("{experimentId:guid}/groups")]
@@ -244,6 +245,15 @@ public class ExperimentsController : ControllerBase
     {
         if (!await CanAccessExperimentAsync(experimentId)) return Forbid();
         return Ok(await _groupService.GetByExperimentAsync(experimentId));
+    }
+
+    [HttpGet("{experimentId:guid}/groups/{id:guid}")]
+    public async Task<IActionResult> GetGroupById(Guid experimentId, Guid id)
+    {
+        if (!await CanAccessExperimentAsync(experimentId)) return Forbid();
+        var list = await _groupService.GetByExperimentAsync(experimentId);
+        var result = list.FirstOrDefault(g => g.Id == id);
+        return result == null ? NotFound() : Ok(result);
     }
 
     [HttpPut("groups/{id:guid}")]
@@ -265,14 +275,6 @@ public class ExperimentsController : ControllerBase
 
         await _groupService.DeleteAsync(id);
         return NoContent();
-    }
-
-    private async Task<IActionResult> GetGroupById(Guid experimentId, Guid id)
-    {
-        if (!await CanAccessExperimentAsync(experimentId)) return Forbid();
-        var list = await _groupService.GetByExperimentAsync(experimentId);
-        var result = list.FirstOrDefault(g => g.Id == id);
-        return result == null ? NotFound() : Ok(result);
     }
 
     // ========== Experiment Design ==========

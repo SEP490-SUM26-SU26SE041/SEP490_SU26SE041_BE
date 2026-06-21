@@ -21,12 +21,13 @@ public class CropsController : ControllerBase
 
     // ========== Crops ==========
 
+    [Authorize(Roles = "Admin")]
     [HttpPost]
     public async Task<IActionResult> CreateCrop([FromBody] CreateCropDto dto)
     {
         if (!ModelState.IsValid) return BadRequest(ModelState);
         var result = await _cropService.CreateAsync(dto);
-        return CreatedAtAction(nameof(GetCropById), new { id = result.Id }, result);
+        return CreatedAtAction(nameof(GetCropById), new { id = result!.Id }, result);
     }
 
     [HttpGet("{id:guid}")]
@@ -39,6 +40,7 @@ public class CropsController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetAllCrops() => Ok(await _cropService.GetAllAsync());
 
+    [Authorize(Roles = "Admin")]
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> DeleteCrop(Guid id)
     {
@@ -48,12 +50,13 @@ public class CropsController : ControllerBase
 
     // ========== Crop Varieties ==========
 
+    [Authorize(Roles = "Admin")]
     [HttpPost("varieties")]
     public async Task<IActionResult> CreateVariety([FromBody] CreateCropVarietyDto dto)
     {
         if (!ModelState.IsValid) return BadRequest(ModelState);
         var result = await _varietyService.CreateAsync(dto);
-        return CreatedAtAction(nameof(GetVarietyById), new { id = result.Id }, result);
+        return CreatedAtAction(nameof(GetVarietyById), new { id = result!.Id }, result);
     }
 
     [HttpGet("varieties/{id:guid}")]
@@ -67,6 +70,7 @@ public class CropsController : ControllerBase
     public async Task<IActionResult> GetVarietiesByCrop(Guid cropId)
         => Ok(await _varietyService.GetByCropAsync(cropId));
 
+    [Authorize(Roles = "Admin")]
     [HttpDelete("varieties/{id:guid}")]
     public async Task<IActionResult> DeleteVariety(Guid id)
     {

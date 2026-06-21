@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using SmartFarmSEP490.Model.Enums;
 
 namespace SmartFarmSEP490.Model;
 
@@ -14,6 +15,8 @@ public partial class TaskAssignment
     public Guid? AssignedBy { get; set; }
 
     public string? Reason { get; set; }
+
+    public TaskAssignmentStatus Status { get; set; } = TaskAssignmentStatus.Assigned;
 
     public DateTime AssignedAt { get; set; }
 

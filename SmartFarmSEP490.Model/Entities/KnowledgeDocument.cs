@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using SmartFarmSEP490.Model.Enums;
 
 namespace SmartFarmSEP490.Model;
 
@@ -16,6 +17,8 @@ public partial class KnowledgeDocument
     public string? FileUrl { get; set; }
 
     public Guid? UploadedBy { get; set; }
+
+    public DocumentStatus Status { get; set; } = DocumentStatus.Draft;
 
     public DateTime CreatedAt { get; set; }
 

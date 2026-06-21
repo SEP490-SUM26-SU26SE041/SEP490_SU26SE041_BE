@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using SmartFarmSEP490.Model.Enums;
 
 namespace SmartFarmSEP490.Model;
 
@@ -33,7 +34,7 @@ public partial class Experiment
 
     public DateTime UpdatedAt { get; set; }
 
-    public string Status { get; set; } = "Draft";
+    public ExperimentStatus Status { get; set; } = ExperimentStatus.Draft;
 
     public DateTime? DeletedAt { get; set; }
 

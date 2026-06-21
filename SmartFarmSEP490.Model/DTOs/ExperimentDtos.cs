@@ -1,5 +1,7 @@
 namespace SmartFarmSEP490.Model.DTOs;
 
+using SmartFarmSEP490.Model.Enums;
+
 // ============ Experiment DTOs ============
 
 public class CreateExperimentDto
@@ -63,7 +65,7 @@ public class CreateExperimentStageDto
     public string? Objective { get; set; }
     public DateOnly? StartDate { get; set; }
     public DateOnly? EndDate { get; set; }
-    public string? StageType { get; set; }
+    public ExperimentStageType StageType { get; set; } = ExperimentStageType.Other;
 }
 
 public class UpdateExperimentStageDto
@@ -75,7 +77,7 @@ public class UpdateExperimentStageDto
     public DateOnly? EndDate { get; set; }
     public string? ResultSummary { get; set; }
     public string? ResultData { get; set; }
-    public string? StageType { get; set; }
+    public ExperimentStageType? StageType { get; set; }
 }
 
 public class ExperimentStageResponseDto
@@ -90,7 +92,7 @@ public class ExperimentStageResponseDto
     public string? ResultData { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
-    public string? StageType { get; set; }
+    public ExperimentStageType StageType { get; set; }
 }
 
 // ============ ExperimentGroup DTOs ============
@@ -188,7 +190,7 @@ public class CreateProcedureTemplateStepDto
     public string Instruction { get; set; } = string.Empty;
     public int? ExpectedDurationDays { get; set; }
     public string? RequiredSkillDescription { get; set; }
-    public string? StageType { get; set; }
+    public ExperimentStageType? StageType { get; set; }
 }
 
 public class UpdateProcedureTemplateStepDto
@@ -198,7 +200,7 @@ public class UpdateProcedureTemplateStepDto
     public string? Instruction { get; set; }
     public int? ExpectedDurationDays { get; set; }
     public string? RequiredSkillDescription { get; set; }
-    public string? StageType { get; set; }
+    public ExperimentStageType? StageType { get; set; }
 }
 
 public class ProcedureTemplateResponseDto
@@ -221,7 +223,7 @@ public class ProcedureTemplateStepResponseDto
     public string Instruction { get; set; } = string.Empty;
     public int? ExpectedDurationDays { get; set; }
     public string? RequiredSkillDescription { get; set; }
-    public string? StageType { get; set; }
+    public ExperimentStageType StageType { get; set; }
 }
 
 // ============ CareSchedule DTOs ============

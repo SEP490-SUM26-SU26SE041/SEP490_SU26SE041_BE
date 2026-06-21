@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -73,7 +74,21 @@ System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler.DefaultMapInboundClaims 
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")!;
 var dataSourceBuilder = new NpgsqlDataSourceBuilder(connectionString);
-dataSourceBuilder.MapEnum<ExperimentStageType>("ExperimentStageType", new NpgsqlNullNameTranslator());
+dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.AIReviewStatus>("AIReviewStatus", new NpgsqlNullNameTranslator());
+dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.AlertSeverity>("AlertSeverity", new NpgsqlNullNameTranslator());
+dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.BatchStatus>("BatchStatus", new NpgsqlNullNameTranslator());
+dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.DesignType>("DesignType", new NpgsqlNullNameTranslator());
+dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.DocumentStatus>("DocumentStatus", new NpgsqlNullNameTranslator());
+dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.ExperimentStageType>("ExperimentStageType", new NpgsqlNullNameTranslator());
+dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.ExperimentStatus>("ExperimentStatus", new NpgsqlNullNameTranslator());
+dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.GroupType>("GroupType", new NpgsqlNullNameTranslator());
+dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.LocationStatus>("LocationStatus", new NpgsqlNullNameTranslator());
+dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.RequestStatus>("RequestStatus", new NpgsqlNullNameTranslator());
+dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.ReviewResult>("ReviewResult", new NpgsqlNullNameTranslator());
+dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.SensorType>("SensorType", new NpgsqlNullNameTranslator());
+dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.TaskAssignmentStatus>("TaskAssignmentStatus", new NpgsqlNullNameTranslator());
+dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.TaskStatus>("TaskStatus", new NpgsqlNullNameTranslator());
+dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.TaskType>("TaskType", new NpgsqlNullNameTranslator());
 var dataSource = dataSourceBuilder.Build();
 
 builder.Services.AddDbContext<SmartFarmDbContext>(options =>
@@ -187,12 +202,22 @@ builder.Services.AddCors(options =>
     });
 });
 
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+    });
+builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(options =>
+{
+    options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
+});
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddSignalR();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
+    options.SupportNonNullableReferenceTypes();
+    options.UseInlineDefinitionsForEnums();
     options.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
     {
         Name = "Authorization",

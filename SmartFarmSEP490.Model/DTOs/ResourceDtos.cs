@@ -1,5 +1,7 @@
 namespace SmartFarmSEP490.Model.DTOs;
 
+using SmartFarmSEP490.Model.Enums;
+
 // ============ Farm DTOs ============
 
 public class CreateFarmDto
@@ -41,6 +43,7 @@ public class CreateAreaDto
     public string AreaName { get; set; } = string.Empty;
     public string? EnvironmentType { get; set; }
     public decimal? TotalArea { get; set; }
+    public LocationStatus Status { get; set; } = LocationStatus.Available;
 }
 
 public class UpdateAreaDto
@@ -49,6 +52,7 @@ public class UpdateAreaDto
     public string? AreaName { get; set; }
     public string? EnvironmentType { get; set; }
     public decimal? TotalArea { get; set; }
+    public LocationStatus? Status { get; set; }
 }
 
 public class AreaResponseDto
@@ -58,6 +62,7 @@ public class AreaResponseDto
     public string AreaName { get; set; } = string.Empty;
     public string? EnvironmentType { get; set; }
     public decimal? TotalArea { get; set; }
+    public LocationStatus Status { get; set; }
     public Guid FarmId { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
