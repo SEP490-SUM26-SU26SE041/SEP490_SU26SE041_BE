@@ -54,12 +54,12 @@ public class TaskService : ITaskService
             BatchId = dto.BatchId,
             CareScheduleId = dto.CareScheduleId,
             CreatedBy = createdById,
-            //TaskType = dto.TaskType,
+            TaskType = dto.TaskType,
             Title = dto.Title,
             Description = dto.Description,
             RequiredSkillDescription = dto.RequiredSkillDescription,
             DueDate = dto.DueDate,
-            //Status = "Pending",
+            Status = "Pending",
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -106,12 +106,12 @@ public class TaskService : ITaskService
         if (dto.ExperimentStageId != null) task.ExperimentStageId = dto.ExperimentStageId;
         if (dto.BatchId != null) task.BatchId = dto.BatchId;
         if (dto.CareScheduleId != null) task.CareScheduleId = dto.CareScheduleId;
-        //if (!string.IsNullOrEmpty(dto.TaskType)) task.TaskType = dto.TaskType;
+        if (!string.IsNullOrEmpty(dto.TaskType)) task.TaskType = dto.TaskType;
         if (!string.IsNullOrEmpty(dto.Title)) task.Title = dto.Title;
         if (dto.Description != null) task.Description = dto.Description;
         if (dto.RequiredSkillDescription != null) task.RequiredSkillDescription = dto.RequiredSkillDescription;
         if (dto.DueDate.HasValue) task.DueDate = dto.DueDate;
-        //if (!string.IsNullOrEmpty(dto.Status)) task.Status = dto.Status;
+        if (!string.IsNullOrEmpty(dto.Status)) task.Status = dto.Status;
         task.UpdatedAt = DateTime.UtcNow;
 
         await _taskRepository.UpdateAsync(task);
