@@ -36,7 +36,7 @@ public class FarmsController : ControllerBase
         if (!ModelState.IsValid) return BadRequest(ModelState);
         var userId = this.GetUserId();
         var result = await _farmService.CreateAsync(dto, userId == Guid.Empty ? null : userId);
-        if (result == null) return StatusCode(500, new { error = "Create farm returned null (DB insert may have failed silently)" });
+        if (result == null) return StatusCode(500, new { message = "Tao nong trai that bai." });
         return CreatedAtAction(nameof(GetFarmById), new { id = result.Id }, result);
     }
 
@@ -138,7 +138,7 @@ public class FarmsController : ControllerBase
     {
         if (!ModelState.IsValid) return BadRequest(ModelState);
         var area = await _areaService.GetByIdAsync(dto.AreaId);
-        if (area == null) return BadRequest(new { message = "Area not found" });
+        if (area == null) return BadRequest(new { message = "Khu vuc khong ton tai." });
         if (!await CanAccessFarmAsync(area.FarmId)) return Forbid();
         var result = await _bedService.CreateAsync(dto);
         return CreatedAtAction(nameof(GetBedById), new { id = result.Id }, result);
@@ -196,7 +196,7 @@ public class FarmsController : ControllerBase
     {
         if (!ModelState.IsValid) return BadRequest(ModelState);
         var bed = await _bedService.GetByIdAsync(dto.BedId);
-        if (bed == null) return BadRequest(new { message = "Bed not found" });
+        if (bed == null) return BadRequest(new { message = "Lo trong khong ton tai." });
         if (!await CanAccessFarmAsync(bed.FarmId)) return Forbid();
         try
         {

@@ -2,9 +2,12 @@ using M = SmartFarmSEP490.Model;
 using Microsoft.EntityFrameworkCore;
 using SmartFarmSEP490.Model.DTOs;
 using SmartFarmSEP490.Model.Enums;
+using SmartFarmSEP490.Repository.Interfaces.Beds;
 using SmartFarmSEP490.Repository.Interfaces.CareSchedules;
+using SmartFarmSEP490.Repository.Interfaces.ExperimentBedAssignments;
 using SmartFarmSEP490.Repository.Interfaces.ExperimentDesigns;
 using SmartFarmSEP490.Repository.Interfaces.ExperimentGroups;
+using SmartFarmSEP490.Repository.Interfaces.ExperimentRequests;
 using SmartFarmSEP490.Repository.Interfaces.ExperimentStages;
 using SmartFarmSEP490.Repository.Interfaces.Experiments;
 using SmartFarmSEP490.Repository.Interfaces.MeasurementDefinitions;
@@ -17,19 +20,37 @@ public class ExperimentService : IExperimentService
 {
     private readonly IExperimentRepository _experimentRepository;
     private readonly IProcedureTemplateRepository _templateRepository;
+    private readonly IExperimentRequestRepository _requestRepository;
+    private readonly IExperimentBedAssignmentRepository _bedAssignmentRepository;
+    private readonly IBedRepository _bedRepository;
 
     public ExperimentService(
         IExperimentRepository experimentRepository,
-        IProcedureTemplateRepository templateRepository)
+        IProcedureTemplateRepository templateRepository,
+        IExperimentRequestRepository requestRepository,
+        IExperimentBedAssignmentRepository bedAssignmentRepository,
+        IBedRepository bedRepository)
     {
         _experimentRepository = experimentRepository;
         _templateRepository = templateRepository;
+        _requestRepository = requestRepository;
+        _bedAssignmentRepository = bedAssignmentRepository;
+        _bedRepository = bedRepository;
     }
 
     public async Task<ExperimentResponseDto?> CreateAsync(CreateExperimentDto dto, Guid researcherId)
     {
         try
         {
+            if (dto.RequestId.HasValue)
+            {
+                var request = await _requestRepository.GetByIdAsync(dto.RequestId.Value);
+                if (request == null)
+                    throw new InvalidOperationException($"Khong tim thay yeu cau thuc nghiem voi ID: {dto.RequestId}");
+                if (request.Status != RequestStatus.Approved)
+                    throw new InvalidOperationException($"Yeu cau thuc nghiem phai co trang thai 'Approved' de co the tao thuc nghiem. Trang thai hien tai: '{request.Status}'");
+            }
+
             var entity = new M.Experiment
             {
                 RequestId = dto.RequestId,
@@ -69,7 +90,56 @@ public class ExperimentService : IExperimentService
             var resultOnly = await _experimentRepository.CreateAsync(entity);
             return await GetByIdAsync(resultOnly.Id);
         }
-        catch (Exception ex) { throw new Exception($"Create experiment failed: {ex.Message}"); }
+        catch (InvalidOperationException) { throw; }
+        catch (Exception ex) { throw new Exception($"Tao thuc nghiem that bai: {ex.InnerException?.Message ?? ex.Message}", ex); }
+    }
+
+    public async Task<ExperimentResponseDto?> CreateFromRequestAsync(Guid requestId, Guid researcherId)
+    {
+        try
+        {
+            var request = await _requestRepository.GetByIdAsync(requestId);
+            if (request == null)
+                throw new InvalidOperationException($"Khong tim thay yeu cau thuc nghiem voi ID: {requestId}");
+            if (request.Status != RequestStatus.Approved)
+                throw new InvalidOperationException($"Yeu cau thuc nghiem phai co trang thai 'Approved' de co the tao thuc nghiem. Trang thai hien tai: '{request.Status}'");
+
+            var entity = new M.Experiment
+            {
+                RequestId = requestId,
+                FarmId = request.FarmId,
+                ResearcherId = researcherId,
+                CropVarietyId = request.CropVarietyId,
+                ProcedureTemplateId = request.ProcedureTemplateId,
+                Title = request.Title,
+                Objective = request.Objective,
+                Status = ExperimentStatus.Draft
+            };
+
+            if (request.ProcedureTemplateId.HasValue)
+            {
+                var template = await _templateRepository.GetByIdWithStepsAsync(request.ProcedureTemplateId.Value);
+                if (template != null && template.ProcedureTemplateSteps?.Count > 0)
+                {
+                    var stages = template.ProcedureTemplateSteps
+                        .OrderBy(s => s.StepOrder)
+                        .Select(s => new M.ExperimentStage
+                        {
+                            StageOrder = s.StepOrder, StageName = s.Title,
+                            StageType = s.StageType, Objective = s.Instruction
+                        }).ToList();
+                    var created = await _experimentRepository.CreateWithStagesAsync(entity, stages);
+                    await _bedAssignmentRepository.AssignBedsToExperimentAsync(requestId, created.Id);
+                    return await GetByIdAsync(created.Id);
+                }
+            }
+
+            var resultOnly = await _experimentRepository.CreateAsync(entity);
+            await _bedAssignmentRepository.AssignBedsToExperimentAsync(requestId, resultOnly.Id);
+            return await GetByIdAsync(resultOnly.Id);
+        }
+        catch (InvalidOperationException) { throw; }
+        catch (Exception ex) { throw new Exception($"Tao thuc nghiem tu yeu cau that bai: {ex.InnerException?.Message ?? ex.Message}", ex); }
     }
 
     public async Task<ExperimentResponseDto?> UpdateAsync(Guid id, UpdateExperimentDto dto, Guid researcherId)
@@ -88,7 +158,8 @@ public class ExperimentService : IExperimentService
             await _experimentRepository.UpdateAsync(entity);
             return await GetByIdAsync(id);
         }
-        catch (Exception ex) { throw new Exception($"Update experiment failed: {ex.Message}"); }
+        catch (InvalidOperationException) { throw; }
+        catch (Exception ex) { throw new Exception($"Cap nhat thuc nghiem that bai: {ex.InnerException?.Message ?? ex.Message}", ex); }
     }
 
     public async Task<ExperimentResponseDto?> UpdateStatusAsync(Guid id, string status, Guid researcherId)
@@ -101,7 +172,8 @@ public class ExperimentService : IExperimentService
             await _experimentRepository.UpdateAsync(entity);
             return await GetByIdAsync(id);
         }
-        catch (Exception ex) { throw new Exception($"Update experiment status failed: {ex.Message}"); }
+        catch (InvalidOperationException) { throw; }
+        catch (Exception ex) { throw new Exception($"Cap nhat trang thai thuc nghiem that bai: {ex.InnerException?.Message ?? ex.Message}", ex); }
     }
 
     public async Task<ExperimentResponseDto?> GetByIdAsync(Guid id)
@@ -112,7 +184,8 @@ public class ExperimentService : IExperimentService
             if (entity == null) return null;
             return MapToResponseDto(entity);
         }
-        catch (Exception ex) { throw new Exception($"Get experiment failed: {ex.Message}"); }
+        catch (InvalidOperationException) { throw; }
+        catch (Exception ex) { throw new Exception($"Lay thong tin thuc nghiem that bai: {ex.InnerException?.Message ?? ex.Message}", ex); }
     }
 
     public async Task<List<ExperimentResponseDto>> GetAllAsync()
@@ -122,7 +195,8 @@ public class ExperimentService : IExperimentService
             var entities = await _experimentRepository.GetAllAsync();
             return entities.Select(MapToResponseDto).ToList();
         }
-        catch (Exception ex) { throw new Exception($"Get all experiments failed: {ex.Message}"); }
+        catch (InvalidOperationException) { throw; }
+        catch (Exception ex) { throw new Exception($"Lay danh sach thuc nghiem that bai: {ex.InnerException?.Message ?? ex.Message}", ex); }
     }
 
     public async Task<List<ExperimentResponseDto>> GetByResearcherAsync(Guid researcherId)
@@ -132,7 +206,8 @@ public class ExperimentService : IExperimentService
             var entities = await _experimentRepository.GetByResearcherAsync(researcherId);
             return entities.Select(MapToResponseDto).ToList();
         }
-        catch (Exception ex) { throw new Exception($"Get experiments by researcher failed: {ex.Message}"); }
+        catch (InvalidOperationException) { throw; }
+        catch (Exception ex) { throw new Exception($"Lay danh sach thuc nghiem theo nha nghien cuu that bai: {ex.InnerException?.Message ?? ex.Message}", ex); }
     }
 
     public async Task<List<ExperimentResponseDto>> GetByFarmAsync(Guid farmId)
@@ -142,7 +217,8 @@ public class ExperimentService : IExperimentService
             var entities = await _experimentRepository.GetByFarmAsync(farmId);
             return entities.Select(MapToResponseDto).ToList();
         }
-        catch (Exception ex) { throw new Exception($"Get experiments by farm failed: {ex.Message}"); }
+        catch (InvalidOperationException) { throw; }
+        catch (Exception ex) { throw new Exception($"Lay danh sach thuc nghiem theo trai that bai: {ex.InnerException?.Message ?? ex.Message}", ex); }
     }
 
     public async Task<bool> DeleteAsync(Guid id)
@@ -151,10 +227,12 @@ public class ExperimentService : IExperimentService
         {
             var entity = await _experimentRepository.GetByIdAsync(id);
             if (entity == null) return false;
+            await _bedAssignmentRepository.ReleaseBedsAsync(id);
             await _experimentRepository.DeleteAsync(id);
             return true;
         }
-        catch (Exception ex) { throw new Exception($"Delete experiment failed: {ex.Message}"); }
+        catch (InvalidOperationException) { throw; }
+        catch (Exception ex) { throw new Exception($"Xoa thuc nghiem that bai: {ex.InnerException?.Message ?? ex.Message}", ex); }
     }
 
     private static ExperimentResponseDto MapToResponseDto(M.Experiment entity)
@@ -185,11 +263,11 @@ public class ExperimentService : IExperimentService
                 Id = s.Id, StageName = s.StageName, StageOrder = s.StageOrder,
                 Objective = s.Objective, StartDate = s.StartDate, EndDate = s.EndDate,
                 ResultSummary = s.ResultSummary, ResultData = s.ResultData,
-                CreatedAt = s.CreatedAt, UpdatedAt = s.UpdatedAt, StageType = s.StageType
+                CreatedAt = s.CreatedAt, UpdatedAt = s.UpdatedAt, StageType = s.StageType.ToString()
             }).ToList() ?? new(),
             Groups = entity.ExperimentGroups?.Select(g => new ExperimentGroupResponseDto
             {
-                Id = g.Id, GroupName = g.GroupName, TreatmentDescription = g.TreatmentDescription, CreatedAt = g.CreatedAt
+                Id = g.Id, GroupName = g.GroupName, TreatmentDescription = g.TreatmentDescription, GroupType = g.GroupType.ToString(), CreatedAt = g.CreatedAt
             }).ToList() ?? new(),
             MeasurementDefinitions = entity.MeasurementDefinitions?.Select(m => new MeasurementDefinitionResponseDto
             {
@@ -199,6 +277,7 @@ public class ExperimentService : IExperimentService
             Design = entity.ExperimentDesign != null ? new ExperimentDesignResponseDto
             {
                 Id = entity.ExperimentDesign.Id,
+                DesignType = entity.ExperimentDesign.DesignType.ToString(),
                 ReplicationCount = entity.ExperimentDesign.ReplicationCount,
                 RandomizationMethod = entity.ExperimentDesign.RandomizationMethod,
                 DesignParameters = entity.ExperimentDesign.DesignParameters
@@ -233,7 +312,8 @@ public class ExperimentStageService : IExperimentStageService
             var result = await _stageRepository.CreateAsync(entity);
             return MapToResponseDto(result);
         }
-        catch (Exception ex) { throw new Exception($"Create experiment stage failed: {ex.Message}"); }
+        catch (InvalidOperationException) { throw; }
+        catch (Exception ex) { throw new Exception($"Tao giai doan thuc nghiem that bai: {ex.InnerException?.Message ?? ex.Message}", ex); }
     }
 
     public async Task<ExperimentStageResponseDto?> UpdateAsync(Guid id, UpdateExperimentStageDto dto)
@@ -249,11 +329,12 @@ public class ExperimentStageService : IExperimentStageService
             if (dto.EndDate.HasValue) entity.EndDate = dto.EndDate;
             if (dto.ResultSummary != null) entity.ResultSummary = dto.ResultSummary;
             if (dto.ResultData != null) entity.ResultData = dto.ResultData;
-            if (dto.StageType != null) entity.StageType = dto.StageType.Value;
+            if (dto.StageType.HasValue) entity.StageType = dto.StageType.Value;
             await _stageRepository.UpdateAsync(entity);
             return MapToResponseDto(entity);
         }
-        catch (Exception ex) { throw new Exception($"Update experiment stage failed: {ex.Message}"); }
+        catch (InvalidOperationException) { throw; }
+        catch (Exception ex) { throw new Exception($"Cap nhat giai doan thuc nghiem that bai: {ex.InnerException?.Message ?? ex.Message}", ex); }
     }
 
     public async Task<List<ExperimentStageResponseDto>> GetByExperimentAsync(Guid experimentId)
@@ -263,7 +344,8 @@ public class ExperimentStageService : IExperimentStageService
             var entities = await _stageRepository.GetByExperimentAsync(experimentId);
             return entities.Select(MapToResponseDto).ToList();
         }
-        catch (Exception ex) { throw new Exception($"Get experiment stages failed: {ex.Message}"); }
+        catch (InvalidOperationException) { throw; }
+        catch (Exception ex) { throw new Exception($"Lay danh sach giai doan that bai: {ex.InnerException?.Message ?? ex.Message}", ex); }
     }
 
     public async Task<bool> DeleteAsync(Guid id)
@@ -275,7 +357,8 @@ public class ExperimentStageService : IExperimentStageService
             await _stageRepository.DeleteAsync(id);
             return true;
         }
-        catch (Exception ex) { throw new Exception($"Delete experiment stage failed: {ex.Message}"); }
+        catch (InvalidOperationException) { throw; }
+        catch (Exception ex) { throw new Exception($"Xoa giai doan that bai: {ex.InnerException?.Message ?? ex.Message}", ex); }
     }
 
     private static ExperimentStageResponseDto MapToResponseDto(M.ExperimentStage entity)
@@ -285,7 +368,7 @@ public class ExperimentStageService : IExperimentStageService
             Id = entity.Id, StageName = entity.StageName, StageOrder = entity.StageOrder,
             Objective = entity.Objective, StartDate = entity.StartDate, EndDate = entity.EndDate,
             ResultSummary = entity.ResultSummary, ResultData = entity.ResultData,
-            CreatedAt = entity.CreatedAt, UpdatedAt = entity.UpdatedAt, StageType = entity.StageType
+            CreatedAt = entity.CreatedAt, UpdatedAt = entity.UpdatedAt, StageType = entity.StageType.ToString()
         };
     }
 }
@@ -307,12 +390,14 @@ public class ExperimentGroupService : IExperimentGroupService
             {
                 ExperimentId = experimentId,
                 GroupName = dto.GroupName,
-                TreatmentDescription = dto.TreatmentDescription
+                TreatmentDescription = dto.TreatmentDescription,
+                GroupType = dto.GroupType
             };
             var result = await _groupRepository.CreateAsync(entity);
             return MapToResponseDto(result);
         }
-        catch (Exception ex) { throw new Exception($"Create experiment group failed: {ex.Message}"); }
+        catch (InvalidOperationException) { throw; }
+        catch (Exception ex) { throw new Exception($"Tao nhom thuc nghiem that bai: {ex.InnerException?.Message ?? ex.Message}", ex); }
     }
 
     public async Task<ExperimentGroupResponseDto?> UpdateAsync(Guid id, UpdateExperimentGroupDto dto)
@@ -323,10 +408,12 @@ public class ExperimentGroupService : IExperimentGroupService
             if (entity == null) return null;
             if (dto.GroupName != null) entity.GroupName = dto.GroupName;
             if (dto.TreatmentDescription != null) entity.TreatmentDescription = dto.TreatmentDescription;
+            if (dto.GroupType.HasValue) entity.GroupType = dto.GroupType.Value;
             await _groupRepository.UpdateAsync(entity);
             return MapToResponseDto(entity);
         }
-        catch (Exception ex) { throw new Exception($"Update experiment group failed: {ex.Message}"); }
+        catch (InvalidOperationException) { throw; }
+        catch (Exception ex) { throw new Exception($"Cap nhat nhom thuc nghiem that bai: {ex.InnerException?.Message ?? ex.Message}", ex); }
     }
 
     public async Task<List<ExperimentGroupResponseDto>> GetByExperimentAsync(Guid experimentId)
@@ -336,7 +423,8 @@ public class ExperimentGroupService : IExperimentGroupService
             var entities = await _groupRepository.GetByExperimentAsync(experimentId);
             return entities.Select(MapToResponseDto).ToList();
         }
-        catch (Exception ex) { throw new Exception($"Get experiment groups failed: {ex.Message}"); }
+        catch (InvalidOperationException) { throw; }
+        catch (Exception ex) { throw new Exception($"Lay danh sach nhom that bai: {ex.InnerException?.Message ?? ex.Message}", ex); }
     }
 
     public async Task<bool> DeleteAsync(Guid id)
@@ -348,14 +436,14 @@ public class ExperimentGroupService : IExperimentGroupService
             await _groupRepository.DeleteAsync(id);
             return true;
         }
-        catch (Exception ex) { throw new Exception($"Delete experiment group failed: {ex.Message}"); }
+        catch (Exception ex) { throw new Exception($"Xoa nhom that bai: {ex.InnerException?.Message ?? ex.Message}", ex); }
     }
 
     private static ExperimentGroupResponseDto MapToResponseDto(M.ExperimentGroup entity)
     {
         return new ExperimentGroupResponseDto
         {
-            Id = entity.Id, GroupName = entity.GroupName, TreatmentDescription = entity.TreatmentDescription, CreatedAt = entity.CreatedAt
+            Id = entity.Id, GroupName = entity.GroupName, TreatmentDescription = entity.TreatmentDescription, GroupType = entity.GroupType.ToString(), CreatedAt = entity.CreatedAt
         };
     }
 }
@@ -376,6 +464,7 @@ public class ExperimentDesignService : IExperimentDesignService
             var entity = new M.ExperimentDesign
             {
                 ExperimentId = experimentId,
+                DesignType = dto.DesignType,
                 ReplicationCount = dto.ReplicationCount,
                 RandomizationMethod = dto.RandomizationMethod,
                 DesignParameters = dto.DesignParameters
@@ -383,7 +472,8 @@ public class ExperimentDesignService : IExperimentDesignService
             var result = await _designRepository.CreateAsync(entity);
             return MapToResponseDto(result);
         }
-        catch (Exception ex) { throw new Exception($"Create experiment design failed: {ex.Message}"); }
+        catch (InvalidOperationException) { throw; }
+        catch (Exception ex) { throw new Exception($"Tao thiet ke that bai: {ex.InnerException?.Message ?? ex.Message}", ex); }
     }
 
     public async Task<ExperimentDesignResponseDto?> UpdateAsync(Guid id, UpdateExperimentDesignDto dto)
@@ -392,13 +482,15 @@ public class ExperimentDesignService : IExperimentDesignService
         {
             var entity = await _designRepository.GetByExperimentAsync(id);
             if (entity == null) return null;
+            if (dto.DesignType.HasValue) entity.DesignType = dto.DesignType.Value;
             if (dto.ReplicationCount.HasValue) entity.ReplicationCount = dto.ReplicationCount;
             if (dto.RandomizationMethod != null) entity.RandomizationMethod = dto.RandomizationMethod;
             if (dto.DesignParameters != null) entity.DesignParameters = dto.DesignParameters;
             await _designRepository.UpdateAsync(entity);
             return MapToResponseDto(entity);
         }
-        catch (Exception ex) { throw new Exception($"Update experiment design failed: {ex.Message}"); }
+        catch (InvalidOperationException) { throw; }
+        catch (Exception ex) { throw new Exception($"Cap nhat thiet ke that bai: {ex.InnerException?.Message ?? ex.Message}", ex); }
     }
 
     public async Task<ExperimentDesignResponseDto?> GetByExperimentAsync(Guid experimentId)
@@ -408,7 +500,8 @@ public class ExperimentDesignService : IExperimentDesignService
             var entity = await _designRepository.GetByExperimentAsync(experimentId);
             return entity != null ? MapToResponseDto(entity) : null;
         }
-        catch (Exception ex) { throw new Exception($"Get experiment design failed: {ex.Message}"); }
+        catch (InvalidOperationException) { throw; }
+        catch (Exception ex) { throw new Exception($"Lay thiet ke that bai: {ex.InnerException?.Message ?? ex.Message}", ex); }
     }
 
     public async Task<bool> DeleteAsync(Guid experimentId)
@@ -418,14 +511,15 @@ public class ExperimentDesignService : IExperimentDesignService
             await _designRepository.DeleteAsync(experimentId);
             return true;
         }
-        catch (Exception ex) { throw new Exception($"Delete experiment design failed: {ex.Message}"); }
+        catch (InvalidOperationException) { throw; }
+        catch (Exception ex) { throw new Exception($"Xoa thiet ke that bai: {ex.InnerException?.Message ?? ex.Message}", ex); }
     }
 
     private static ExperimentDesignResponseDto MapToResponseDto(M.ExperimentDesign entity)
     {
         return new ExperimentDesignResponseDto
         {
-            Id = entity.Id, ReplicationCount = entity.ReplicationCount,
+            Id = entity.Id, DesignType = entity.DesignType.ToString(), ReplicationCount = entity.ReplicationCount,
             RandomizationMethod = entity.RandomizationMethod, DesignParameters = entity.DesignParameters
         };
     }
@@ -456,7 +550,8 @@ public class MeasurementDefinitionService : IMeasurementDefinitionService
             var result = await _measurementRepository.CreateAsync(entity);
             return MapToResponseDto(result);
         }
-        catch (Exception ex) { throw new Exception($"Create measurement definition failed: {ex.Message}"); }
+        catch (InvalidOperationException) { throw; }
+        catch (Exception ex) { throw new Exception($"Tao chi so do luong that bai: {ex.InnerException?.Message ?? ex.Message}", ex); }
     }
 
     public async Task<MeasurementDefinitionResponseDto?> UpdateAsync(Guid id, UpdateMeasurementDefinitionDto dto)
@@ -473,7 +568,8 @@ public class MeasurementDefinitionService : IMeasurementDefinitionService
             await _measurementRepository.UpdateAsync(entity);
             return MapToResponseDto(entity);
         }
-        catch (Exception ex) { throw new Exception($"Update measurement definition failed: {ex.Message}"); }
+        catch (InvalidOperationException) { throw; }
+        catch (Exception ex) { throw new Exception($"Cap nhat chi so do luong that bai: {ex.InnerException?.Message ?? ex.Message}", ex); }
     }
 
     public async Task<List<MeasurementDefinitionResponseDto>> GetByExperimentAsync(Guid experimentId)
@@ -483,7 +579,8 @@ public class MeasurementDefinitionService : IMeasurementDefinitionService
             var entities = await _measurementRepository.GetByExperimentAsync(experimentId);
             return entities.Select(MapToResponseDto).ToList();
         }
-        catch (Exception ex) { throw new Exception($"Get measurement definitions failed: {ex.Message}"); }
+        catch (InvalidOperationException) { throw; }
+        catch (Exception ex) { throw new Exception($"Lay danh sach chi so do luong that bai: {ex.InnerException?.Message ?? ex.Message}", ex); }
     }
 
     public async Task<bool> DeleteAsync(Guid id)
@@ -495,7 +592,8 @@ public class MeasurementDefinitionService : IMeasurementDefinitionService
             await _measurementRepository.DeleteAsync(id);
             return true;
         }
-        catch (Exception ex) { throw new Exception($"Delete measurement definition failed: {ex.Message}"); }
+        catch (InvalidOperationException) { throw; }
+        catch (Exception ex) { throw new Exception($"Xoa chi so do luong that bai: {ex.InnerException?.Message ?? ex.Message}", ex); }
     }
 
     private static MeasurementDefinitionResponseDto MapToResponseDto(M.MeasurementDefinition entity)
@@ -545,8 +643,8 @@ public class ProcedureTemplateService : IProcedureTemplateService
             var result = await _templateRepository.CreateAsync(entity);
             return await GetByIdAsync(result.Id);
         }
-        catch (DbUpdateException ex) { throw new Exception($"Create procedure template failed: {ex.InnerException?.Message ?? ex.Message}", ex); }
-        catch (Exception ex) { throw new Exception($"Create procedure template failed: {ex.InnerException?.Message ?? ex.Message}"); }
+        catch (DbUpdateException ex) { throw new Exception($"Tao mau quy trinh that bai: {ex.InnerException?.Message ?? ex.Message}", ex); }
+        catch (Exception ex) { throw new Exception($"Tao mau quy trinh that bai: {ex.InnerException?.Message ?? ex.Message}"); }
     }
 
     public async Task<ProcedureTemplateResponseDto?> GetByIdAsync(Guid id)
@@ -557,7 +655,8 @@ public class ProcedureTemplateService : IProcedureTemplateService
             if (entity == null) return null;
             return MapToResponseDto(entity);
         }
-        catch (Exception ex) { throw new Exception($"Get procedure template failed: {ex.Message}"); }
+        catch (InvalidOperationException) { throw; }
+        catch (Exception ex) { throw new Exception($"Lay thong tin mau quy trinh that bai: {ex.InnerException?.Message ?? ex.Message}", ex); }
     }
 
     public async Task<List<ProcedureTemplateResponseDto>> GetAllAsync()
@@ -567,7 +666,8 @@ public class ProcedureTemplateService : IProcedureTemplateService
             var entities = await _templateRepository.GetAllAsync();
             return entities.Select(MapToResponseDto).ToList();
         }
-        catch (Exception ex) { throw new Exception($"Get all procedure templates failed: {ex.Message}"); }
+        catch (InvalidOperationException) { throw; }
+        catch (Exception ex) { throw new Exception($"Lay danh sach mau quy trinh that bai: {ex.InnerException?.Message ?? ex.Message}", ex); }
     }
 
     public async Task<List<ProcedureTemplateResponseDto>> GetByCropVarietyAsync(Guid cropVarietyId)
@@ -577,7 +677,8 @@ public class ProcedureTemplateService : IProcedureTemplateService
             var entities = await _templateRepository.GetByCropVarietyAsync(cropVarietyId);
             return entities.Select(MapToResponseDto).ToList();
         }
-        catch (Exception ex) { throw new Exception($"Get procedure templates by crop variety failed: {ex.Message}"); }
+        catch (InvalidOperationException) { throw; }
+        catch (Exception ex) { throw new Exception($"Lay mau quy trinh theo giong that bai: {ex.InnerException?.Message ?? ex.Message}", ex); }
     }
 
     public async Task<bool> DeleteAsync(Guid id)
@@ -589,7 +690,8 @@ public class ProcedureTemplateService : IProcedureTemplateService
             await _templateRepository.DeleteAsync(id);
             return true;
         }
-        catch (Exception ex) { throw new Exception($"Delete procedure template failed: {ex.Message}"); }
+        catch (InvalidOperationException) { throw; }
+        catch (Exception ex) { throw new Exception($"Xoa mau quy trinh that bai: {ex.InnerException?.Message ?? ex.Message}", ex); }
     }
 
     private static ProcedureTemplateResponseDto MapToResponseDto(M.ProcedureTemplate entity)
@@ -603,7 +705,7 @@ public class ProcedureTemplateService : IProcedureTemplateService
             {
                 Id = s.Id, StepOrder = s.StepOrder, Title = s.Title, Instruction = s.Instruction,
                 ExpectedDurationDays = s.ExpectedDurationDays, RequiredSkillDescription = s.RequiredSkillDescription,
-                StageType = s.StageType
+                StageType = s.StageType.ToString()
             }).ToList() ?? new()
         };
     }
@@ -638,7 +740,8 @@ public class CareScheduleService : ICareScheduleService
             var result = await _careScheduleRepository.CreateAsync(entity);
             return await GetByIdAsync(result.Id);
         }
-        catch (Exception ex) { throw new Exception($"Create care schedule failed: {ex.Message}"); }
+        catch (InvalidOperationException) { throw; }
+        catch (Exception ex) { throw new Exception($"Tao lich cham soc that bai: {ex.InnerException?.Message ?? ex.Message}", ex); }
     }
 
     public async Task<CareScheduleResponseDto?> UpdateAsync(Guid id, UpdateCareScheduleDto dto)
@@ -657,7 +760,8 @@ public class CareScheduleService : ICareScheduleService
             await _careScheduleRepository.UpdateAsync(entity);
             return await GetByIdAsync(id);
         }
-        catch (Exception ex) { throw new Exception($"Update care schedule failed: {ex.Message}"); }
+        catch (InvalidOperationException) { throw; }
+        catch (Exception ex) { throw new Exception($"Cap nhat lich cham soc that bai: {ex.InnerException?.Message ?? ex.Message}", ex); }
     }
 
     public async Task<List<CareScheduleResponseDto>> GetByExperimentAsync(Guid experimentId)
@@ -667,7 +771,8 @@ public class CareScheduleService : ICareScheduleService
             var entities = await _careScheduleRepository.GetByExperimentAsync(experimentId);
             return entities.Select(MapToResponseDto).ToList();
         }
-        catch (Exception ex) { throw new Exception($"Get care schedules failed: {ex.Message}"); }
+        catch (InvalidOperationException) { throw; }
+        catch (Exception ex) { throw new Exception($"Lay danh sach lich cham soc that bai: {ex.InnerException?.Message ?? ex.Message}", ex); }
     }
 
     public async Task<bool> DeleteAsync(Guid id)
@@ -679,7 +784,8 @@ public class CareScheduleService : ICareScheduleService
             await _careScheduleRepository.DeleteAsync(id);
             return true;
         }
-        catch (Exception ex) { throw new Exception($"Delete care schedule failed: {ex.Message}"); }
+        catch (InvalidOperationException) { throw; }
+        catch (Exception ex) { throw new Exception($"Xoa lich cham soc that bai: {ex.InnerException?.Message ?? ex.Message}", ex); }
     }
 
     private async Task<CareScheduleResponseDto?> GetByIdAsync(Guid id)

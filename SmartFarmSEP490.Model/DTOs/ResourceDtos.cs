@@ -1,6 +1,6 @@
-namespace SmartFarmSEP490.Model.DTOs;
-
 using SmartFarmSEP490.Model.Enums;
+
+namespace SmartFarmSEP490.Model.DTOs;
 
 // ============ Farm DTOs ============
 
@@ -62,7 +62,7 @@ public class AreaResponseDto
     public string AreaName { get; set; } = string.Empty;
     public string? EnvironmentType { get; set; }
     public decimal? TotalArea { get; set; }
-    public LocationStatus Status { get; set; }
+    public string Status { get; set; } = string.Empty;
     public Guid FarmId { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
@@ -95,6 +95,7 @@ public class BedResponseDto
     public string? SoilDescription { get; set; }
     public decimal? Length { get; set; }
     public decimal? Width { get; set; }
+    public string? AllocationStatus { get; set; }
     public Guid AreaId { get; set; }
     public string? AreaName { get; set; }
     public Guid FarmId { get; set; }
@@ -102,11 +103,27 @@ public class BedResponseDto
     public DateTime UpdatedAt { get; set; }
 }
 
+// ============ Bed Reservation DTOs ============
+
+public class ReserveBedsDto
+{
+    public Guid RequestId { get; set; }
+    public List<Guid> BedIds { get; set; } = new();
+}
+
+public class BedReservationResponseDto
+{
+    public Guid RequestId { get; set; }
+    public int ReservedCount { get; set; }
+    public List<BedResponseDto> ReservedBeds { get; set; } = new();
+}
+
 // ============ ExperimentBedAssignment DTOs ============
 
 public class CreateExperimentBedAssignmentDto
 {
-    public Guid ExperimentId { get; set; }
+    public Guid? RequestId { get; set; }
+    public Guid? ExperimentId { get; set; }
     public Guid BedId { get; set; }
     public DateOnly AssignedFrom { get; set; }
     public DateOnly? AssignedTo { get; set; }
@@ -123,10 +140,12 @@ public class UpdateExperimentBedAssignmentDto
 public class ExperimentBedAssignmentResponseDto
 {
     public Guid Id { get; set; }
-    public Guid ExperimentId { get; set; }
+    public Guid? RequestId { get; set; }
+    public Guid? ExperimentId { get; set; }
     public string? ExperimentTitle { get; set; }
     public Guid BedId { get; set; }
     public string? BedCode { get; set; }
+    public string? AllocationStatus { get; set; }
     public string? AreaName { get; set; }
     public string? FarmName { get; set; }
     public DateOnly AssignedFrom { get; set; }
@@ -159,6 +178,7 @@ public class UpdateBatchDto
     public DateOnly? ExpectedHarvestDate { get; set; }
     public int? PlantCount { get; set; }
     public string? Notes { get; set; }
+    public string? Status { get; set; }
 }
 
 public class BatchResponseDto
@@ -169,6 +189,7 @@ public class BatchResponseDto
     public DateOnly? ExpectedHarvestDate { get; set; }
     public int? PlantCount { get; set; }
     public string? Notes { get; set; }
+    public string? Status { get; set; }
     public DateTime CreatedAt { get; set; }
     public Guid ExperimentId { get; set; }
     public string? ExperimentTitle { get; set; }

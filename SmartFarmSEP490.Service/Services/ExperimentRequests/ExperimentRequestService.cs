@@ -3,6 +3,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using SmartFarmSEP490.Model.DTOs;
 using SmartFarmSEP490.Model.Enums;
+using SmartFarmSEP490.Repository.Interfaces.Beds;
+using SmartFarmSEP490.Repository.Interfaces.ExperimentBedAssignments;
 using SmartFarmSEP490.Repository.Interfaces.ExperimentRequests;
 using SmartFarmSEP490.Repository.Interfaces.Farms;
 using SmartFarmSEP490.Service.Interfaces.ExperimentRequests;
@@ -14,17 +16,23 @@ public class ExperimentRequestService : IExperimentRequestService
     private readonly IExperimentRequestRepository _requestRepository;
     private readonly IRequestReviewRepository _reviewRepository;
     private readonly IFarmRepository _farmRepository;
+    private readonly IBedRepository _bedRepository;
+    private readonly IExperimentBedAssignmentRepository _bedAssignmentRepository;
     private readonly ILogger<ExperimentRequestService> _logger;
 
     public ExperimentRequestService(
         IExperimentRequestRepository requestRepository,
         IRequestReviewRepository reviewRepository,
         IFarmRepository farmRepository,
+        IBedRepository bedRepository,
+        IExperimentBedAssignmentRepository bedAssignmentRepository,
         ILogger<ExperimentRequestService> logger)
     {
         _requestRepository = requestRepository;
         _reviewRepository = reviewRepository;
         _farmRepository = farmRepository;
+        _bedRepository = bedRepository;
+        _bedAssignmentRepository = bedAssignmentRepository;
         _logger = logger;
     }
 
@@ -112,7 +120,8 @@ public class ExperimentRequestService : IExperimentRequestService
             if (entity == null) return null;
             return MapToResponseDto(entity);
         }
-        catch (Exception ex) { throw new Exception($"Get experiment request failed: {ex.Message}"); }
+        catch (InvalidOperationException) { throw; }
+        catch (Exception ex) { throw new Exception($"Lay thong tin yeu cau thuc nghiem that bai: {ex.InnerException?.Message ?? ex.Message}", ex); }
     }
 
     public async Task<List<ExperimentRequestResponseDto>> GetAllAsync()
@@ -122,7 +131,8 @@ public class ExperimentRequestService : IExperimentRequestService
             var entities = await _requestRepository.GetAllAsync();
             return entities.Select(MapToResponseDto).ToList();
         }
-        catch (Exception ex) { throw new Exception($"Get all experiment requests failed: {ex.Message}"); }
+        catch (InvalidOperationException) { throw; }
+        catch (Exception ex) { throw new Exception($"Lay danh sach yeu cau thuc nghiem that bai: {ex.InnerException?.Message ?? ex.Message}", ex); }
     }
 
     public async Task<List<ExperimentRequestResponseDto>> GetByResearcherAsync(Guid researcherId)
@@ -132,7 +142,8 @@ public class ExperimentRequestService : IExperimentRequestService
             var entities = await _requestRepository.GetByResearcherAsync(researcherId);
             return entities.Select(MapToResponseDto).ToList();
         }
-        catch (Exception ex) { throw new Exception($"Get experiment requests by researcher failed: {ex.Message}"); }
+        catch (InvalidOperationException) { throw; }
+        catch (Exception ex) { throw new Exception($"Lay yeu cau theo nha nghien cuu that bai: {ex.InnerException?.Message ?? ex.Message}", ex); }
     }
 
     public async Task<List<ExperimentRequestResponseDto>> GetByFarmAsync(Guid farmId)
@@ -142,7 +153,8 @@ public class ExperimentRequestService : IExperimentRequestService
             var entities = await _requestRepository.GetByFarmAsync(farmId);
             return entities.Select(MapToResponseDto).ToList();
         }
-        catch (Exception ex) { throw new Exception($"Get experiment requests by farm failed: {ex.Message}"); }
+        catch (InvalidOperationException) { throw; }
+        catch (Exception ex) { throw new Exception($"Lay yeu cau theo trai that bai: {ex.InnerException?.Message ?? ex.Message}", ex); }
     }
 
     public async Task<List<ExperimentRequestResponseDto>> GetByStatusAsync(string status)
@@ -152,7 +164,8 @@ public class ExperimentRequestService : IExperimentRequestService
             var entities = await _requestRepository.GetByStatusAsync(status);
             return entities.Select(MapToResponseDto).ToList();
         }
-        catch (Exception ex) { throw new Exception($"Get experiment requests by status failed: {ex.Message}"); }
+        catch (InvalidOperationException) { throw; }
+        catch (Exception ex) { throw new Exception($"Lay yeu cau theo trang thai that bai: {ex.InnerException?.Message ?? ex.Message}", ex); }
     }
 
     public async Task<List<ExperimentRequestResponseDto>> GetByManagerAsync(Guid managerId, RequestStatus? status)
@@ -162,7 +175,8 @@ public class ExperimentRequestService : IExperimentRequestService
             var entities = await _requestRepository.GetByManagerAsync(managerId, status);
             return entities.Select(MapToResponseDto).ToList();
         }
-        catch (Exception ex) { throw new Exception($"Get experiment requests by manager failed: {ex.Message}"); }
+        catch (InvalidOperationException) { throw; }
+        catch (Exception ex) { throw new Exception($"Lay yeu cau theo quan ly that bai: {ex.InnerException?.Message ?? ex.Message}", ex); }
     }
 
     public async Task<RequestReviewResponseDto?> ReviewAsync(Guid requestId, ReviewExperimentRequestDto dto, Guid reviewerId)
@@ -179,31 +193,66 @@ public class ExperimentRequestService : IExperimentRequestService
             };
             await _reviewRepository.CreateAsync(entity);
 
-            // Map ReviewResult -> RequestStatus for parent request
             var newRequestStatus = dto.Result == ReviewResult.Approved
                 ? RequestStatus.Approved
                 : RequestStatus.Rejected;
+
             var request = await _requestRepository.GetByIdAsync(requestId);
             if (request != null)
             {
                 request.Status = newRequestStatus;
                 await _requestRepository.UpdateAsync(request);
+
+                if (dto.Result == ReviewResult.Approved && dto.ReservedBedIds?.Count > 0)
+                {
+                    var farmBedIds = await _bedAssignmentRepository.GetAvailableBedIdsByFarmAsync(request.FarmId);
+                    var unavailable = dto.ReservedBedIds.Where(id => !farmBedIds.Contains(id)).ToList();
+                    if (unavailable.Count > 0)
+                        throw new InvalidOperationException($"Mot so lo khong con trong: {string.Join(", ", unavailable)}");
+
+                    var reservations = dto.ReservedBedIds.Select(bedId => new M.ExperimentBedAssignment
+                    {
+                        RequestId = requestId,
+                        ExperimentId = null,
+                        BedId = bedId,
+                        Status = AllocationStatus.Reserved,
+                        AssignedFrom = request.ExpectedStartDate ?? DateOnly.FromDateTime(DateTime.UtcNow)
+                    }).ToList();
+                    await _bedAssignmentRepository.CreateRangeAsync(reservations);
+                }
             }
 
-            // Reload the review list with full Reviewer (UserRoles -> Role) eagerly loaded
             var reviews = await _reviewRepository.GetByRequestIdAsync(requestId);
             var saved = reviews.FirstOrDefault(r => r.ReviewerId == reviewerId);
             if (saved == null) return null;
             return MapToReviewResponseDto(saved);
         }
+        catch (InvalidOperationException) { throw; }
         catch (DbUpdateException ex)
         {
             var pg = ex.InnerException as Npgsql.PostgresException;
-            _logger.LogError(ex,
-                "Review experiment request failed. SqlState={SqlState} Detail={Detail}",
-                pg?.SqlState, pg?.Detail);
+            _logger.LogError(ex, "Review experiment request failed. SqlState={SqlState} Detail={Detail}", pg?.SqlState, pg?.Detail);
             throw;
         }
+    }
+
+    public async Task<BedReservationResponseDto?> GetReservedBedsAsync(Guid requestId)
+    {
+        var assignments = await _bedAssignmentRepository.GetByRequestAsync(requestId);
+        if (assignments.Count == 0) return null;
+        return new BedReservationResponseDto
+        {
+            RequestId = requestId,
+            ReservedCount = assignments.Count,
+            ReservedBeds = assignments.Select(a => new BedResponseDto
+            {
+                Id = a.Bed.Id, BedCode = a.Bed.BedCode, SoilDescription = a.Bed.SoilDescription,
+                Length = a.Bed.Length, Width = a.Bed.Width, AllocationStatus = a.Status.ToString(),
+                AreaId = a.Bed.AreaId, AreaName = a.Bed.Area?.AreaName,
+                FarmId = a.Bed.Area?.FarmId ?? Guid.Empty,
+                CreatedAt = a.Bed.CreatedAt, UpdatedAt = a.Bed.UpdatedAt
+            }).ToList()
+        };
     }
 
     public async Task<bool> DeleteAsync(Guid id)
@@ -215,7 +264,8 @@ public class ExperimentRequestService : IExperimentRequestService
             await _requestRepository.DeleteAsync(id);
             return true;
         }
-        catch (Exception ex) { throw new Exception($"Delete experiment request failed: {ex.Message}"); }
+        catch (InvalidOperationException) { throw; }
+        catch (Exception ex) { throw new Exception($"Xoa yeu cau thuc nghiem that bai: {ex.InnerException?.Message ?? ex.Message}", ex); }
     }
 
     public async Task<ResourceValidationResultDto?> ValidateResourcesAsync(Guid requestId)
@@ -246,7 +296,8 @@ public class ExperimentRequestService : IExperimentRequestService
                 Resources = resources
             };
         }
-        catch (Exception ex) { throw new Exception($"Validate resources failed: {ex.Message}"); }
+        catch (InvalidOperationException) { throw; }
+        catch (Exception ex) { throw new Exception($"Kiem tra tai nguyen that bai: {ex.InnerException?.Message ?? ex.Message}", ex); }
     }
 
     private static ExperimentRequestResponseDto MapToResponseDto(M.ExperimentRequest entity)

@@ -42,5 +42,7 @@ public partial class ExperimentRequest
 
     public virtual ICollection<RequestReview> RequestReviews { get; set; } = new List<RequestReview>();
 
+    public virtual ICollection<ExperimentBedAssignment> BedAssignments { get; set; } = new List<ExperimentBedAssignment>();
+
     public virtual User Researcher { get; set; } = null!;
 }
