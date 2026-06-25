@@ -278,14 +278,31 @@ public class ExperimentRequestService : IExperimentRequestService
             var resources = await _farmRepository.GetFarmResourceSummaryAsync(request.FarmId);
             if (resources == null) return null;
 
-            bool sufficientBeds = resources.AvailableBeds > 0;
+            var availableBedIds = await _bedAssignmentRepository.GetAvailableBedIdsByFarmAsync(request.FarmId);
+            var availableBeds = await _bedRepository.GetByIdsAsync(availableBedIds);
+            var availableBedDtos = availableBeds.Select(b => new BedResponseDto
+            {
+                Id = b.Id,
+                BedCode = b.BedCode,
+                SoilDescription = b.SoilDescription,
+                Length = b.Length,
+                Width = b.Width,
+                AllocationStatus = "Available",
+                AreaId = b.AreaId,
+                AreaName = b.Area?.AreaName,
+                FarmId = b.Area?.FarmId ?? Guid.Empty,
+                CreatedAt = b.CreatedAt,
+                UpdatedAt = b.UpdatedAt
+            }).ToList();
+
+            bool sufficientBeds = availableBedDtos.Count > 0;
             bool isValid = sufficientBeds;
 
             string? message;
             if (!sufficientBeds)
                 message = $"Farm '{resources.FarmName}' hiện không có beds khả dụng cho thực nghiệm mới (đang có {resources.InUseBeds}/{resources.TotalBeds} beds đang được sử dụng).";
             else
-                message = $"Farm '{resources.FarmName}' có {resources.AvailableBeds}/{resources.TotalBeds} beds khả dụng cho thực nghiệm.";
+                message = $"Farm '{resources.FarmName}' có {availableBedDtos.Count}/{resources.TotalBeds} beds khả dụng cho thực nghiệm.";
 
             return new ResourceValidationResultDto
             {
@@ -293,7 +310,8 @@ public class ExperimentRequestService : IExperimentRequestService
                 SufficientBeds = sufficientBeds,
                 SufficientSensors = resources.TotalSensors > 0,
                 Message = message,
-                Resources = resources
+                Resources = resources,
+                AvailableBeds = availableBedDtos
             };
         }
         catch (InvalidOperationException) { throw; }

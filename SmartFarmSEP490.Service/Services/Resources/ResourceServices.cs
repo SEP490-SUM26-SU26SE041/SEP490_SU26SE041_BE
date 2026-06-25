@@ -358,12 +358,22 @@ public class ExperimentBedAssignmentService : SvcInterfaces.IExperimentBedAssign
     {
         try
         {
+            if (dto.RequestId.HasValue && dto.RequestId.Value != Guid.Empty)
+            {
+                await _assignmentRepository.UpdateOrCreateAssignmentAsync(
+                    dto.RequestId.Value, dto.BedId, dto.ExperimentId, dto.AssignedFrom, dto.Purpose);
+                var updated = await _assignmentRepository.GetByRequestAsync(dto.RequestId.Value);
+                var saved = updated.FirstOrDefault(a => a.BedId == dto.BedId);
+                return saved == null ? null : MapToDto(saved);
+            }
+
             var active = await _assignmentRepository.GetActiveByBedAsync(dto.BedId);
             if (active != null)
                 throw new InvalidOperationException($"Luong {dto.BedId} dang co phan cong thuc nghiem khac (chua ket thuc).");
 
             var entity = new M.ExperimentBedAssignment
             {
+                RequestId = dto.RequestId,
                 ExperimentId = dto.ExperimentId,
                 BedId = dto.BedId,
                 AssignedFrom = dto.AssignedFrom,

@@ -97,4 +97,5 @@ public class ResourceValidationResultDto
     public bool SufficientSensors { get; set; }
     public string? Message { get; set; }
     public FarmResourceSummaryDto? Resources { get; set; }
+    public List<BedResponseDto>? AvailableBeds { get; set; }
 }

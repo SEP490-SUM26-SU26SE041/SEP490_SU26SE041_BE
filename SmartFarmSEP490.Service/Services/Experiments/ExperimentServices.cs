@@ -83,11 +83,15 @@ public class ExperimentService : IExperimentService
                         })
                         .ToList();
                     var result = await _experimentRepository.CreateWithStagesAsync(entity, stages);
+                    if (dto.RequestId.HasValue)
+                        await _bedAssignmentRepository.AssignBedsToExperimentAsync(dto.RequestId.Value, result.Id);
                     return await GetByIdAsync(result.Id);
                 }
             }
 
             var resultOnly = await _experimentRepository.CreateAsync(entity);
+            if (dto.RequestId.HasValue)
+                await _bedAssignmentRepository.AssignBedsToExperimentAsync(dto.RequestId.Value, resultOnly.Id);
             return await GetByIdAsync(resultOnly.Id);
         }
         catch (InvalidOperationException) { throw; }

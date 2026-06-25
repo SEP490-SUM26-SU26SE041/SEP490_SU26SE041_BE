@@ -23,12 +23,22 @@ public class ExperimentBedAssignmentRepository : IExperimentBedAssignmentReposit
             .Include(e => e.Bed).ThenInclude(b => b.Area)
             .Where(e => e.ExperimentId == experimentId).ToListAsync();
 
-    public async Task<M.ExperimentBedAssignment?> GetActiveByBedAsync(Guid bedId) =>
-        await _context.ExperimentBedAssignments
+    public async Task<M.ExperimentBedAssignment?> GetActiveByBedAsync(Guid bedId, Guid? currentRequestId = null)
+    {
+        var query = _context.ExperimentBedAssignments
             .Include(e => e.Experiment)
             .Where(e => e.BedId == bedId && e.AssignedTo == null
-                && e.Status != AllocationStatus.Released)
-            .FirstOrDefaultAsync();
+                && e.Status.ToString() != "Released");
+
+        if (currentRequestId.HasValue && currentRequestId.Value != Guid.Empty)
+        {
+            return await query
+                .Where(e => e.RequestId != currentRequestId.Value && e.ExperimentId == null)
+                .FirstOrDefaultAsync();
+        }
+
+        return await query.FirstOrDefaultAsync();
+    }
 
     public async Task<List<M.ExperimentBedAssignment>> GetByBedAsync(Guid bedId) =>
         await _context.ExperimentBedAssignments
@@ -65,7 +75,7 @@ public class ExperimentBedAssignmentRepository : IExperimentBedAssignmentReposit
     public async Task AssignBedsToExperimentAsync(Guid requestId, Guid experimentId)
     {
         var assignments = await _context.ExperimentBedAssignments
-            .Where(e => e.RequestId == requestId && e.Status == AllocationStatus.Reserved).ToListAsync();
+            .Where(e => e.RequestId == requestId && e.Status.ToString() == "Reserved").ToListAsync();
         foreach (var a in assignments)
         {
             a.ExperimentId = experimentId;
@@ -94,9 +104,40 @@ public class ExperimentBedAssignmentRepository : IExperimentBedAssignmentReposit
             .Select(b => b.Id).ToListAsync();
 
         var occupiedBedIds = await _context.ExperimentBedAssignments
-            .Where(e => farmBedIds.Contains(e.BedId) && e.Status != AllocationStatus.Released)
+            .Where(e => farmBedIds.Contains(e.BedId) && e.Status.ToString() != "Released")
             .Select(e => e.BedId).Distinct().ToListAsync();
 
         return farmBedIds.Except(occupiedBedIds).ToList();
+    }
+
+    public async Task UpdateOrCreateAssignmentAsync(Guid requestId, Guid bedId, Guid? experimentId, DateOnly assignedFrom, string? purpose)
+    {
+        var existing = await _context.ExperimentBedAssignments
+            .Where(e => e.RequestId == requestId && e.BedId == bedId)
+            .ToListAsync();
+
+        var active = existing.FirstOrDefault(e => e.AssignedTo == null && e.Status.ToString() != "Released");
+
+        if (active != null)
+        {
+            active.ExperimentId = experimentId;
+            active.Status = AllocationStatus.Assigned;
+            active.AssignedFrom = assignedFrom;
+            active.Purpose = purpose;
+        }
+        else
+        {
+            var entity = new M.ExperimentBedAssignment
+            {
+                RequestId = requestId,
+                ExperimentId = experimentId,
+                BedId = bedId,
+                Status = AllocationStatus.Assigned,
+                AssignedFrom = assignedFrom,
+                Purpose = purpose
+            };
+            await _context.ExperimentBedAssignments.AddAsync(entity);
+        }
+        await _context.SaveChangesAsync();
     }
 }
