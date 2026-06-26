@@ -155,7 +155,10 @@ public class ExperimentRequestsController : ControllerBase
     }
 
     [HttpGet("{id:guid}/resource-summary")]
-    public async Task<IActionResult> GetResourceSummary(Guid id)
+    public async Task<IActionResult> GetResourceSummary(
+        Guid id,
+        [FromQuery] int? replicationCount = null,
+        [FromQuery] int? expectedGroups = null)
     {
         var role = GetRole();
         if (role != "Manager")
@@ -169,7 +172,7 @@ public class ExperimentRequestsController : ControllerBase
         if (farm.ManagerId != GetUserId())
             return StatusCode(403, new { message = "Ban khong phai la quan ly trai nay." });
 
-        var result = await _service.ValidateResourcesAsync(id);
+        var result = await _service.ValidateResourcesAsync(id, replicationCount, expectedGroups);
         return result == null ? NotFound(new { message = "Khong the kiem tra tai nguyen." }) : Ok(result);
     }
 

@@ -465,6 +465,9 @@ public class ExperimentDesignService : IExperimentDesignService
     {
         try
         {
+            if (dto.ReplicationCount.HasValue && dto.ReplicationCount < 2)
+                throw new InvalidOperationException("ReplicationCount phai lon hon hoac bang 2 de dam bao y nghia thong ke.");
+
             var entity = new M.ExperimentDesign
             {
                 ExperimentId = experimentId,
@@ -487,7 +490,12 @@ public class ExperimentDesignService : IExperimentDesignService
             var entity = await _designRepository.GetByExperimentAsync(id);
             if (entity == null) return null;
             if (dto.DesignType.HasValue) entity.DesignType = dto.DesignType.Value;
-            if (dto.ReplicationCount.HasValue) entity.ReplicationCount = dto.ReplicationCount;
+            if (dto.ReplicationCount.HasValue)
+            {
+                if (dto.ReplicationCount < 2)
+                    throw new InvalidOperationException("ReplicationCount phai lon hon hoac bang 2 de dam bao y nghia thong ke.");
+                entity.ReplicationCount = dto.ReplicationCount;
+            }
             if (dto.RandomizationMethod != null) entity.RandomizationMethod = dto.RandomizationMethod;
             if (dto.DesignParameters != null) entity.DesignParameters = dto.DesignParameters;
             await _designRepository.UpdateAsync(entity);

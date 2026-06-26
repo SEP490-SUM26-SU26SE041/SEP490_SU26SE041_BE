@@ -210,6 +210,10 @@ public class ExperimentRequestService : IExperimentRequestService
                     if (unavailable.Count > 0)
                         throw new InvalidOperationException($"Mot so lo khong con trong: {string.Join(", ", unavailable)}");
 
+                    int requiredBeds = (dto.ReplicationCount ?? 1) * (dto.ExpectedGroups ?? 1);
+                    if (dto.ReservedBedIds.Count < requiredBeds)
+                        throw new InvalidOperationException($"So luong lo duoc chon ({dto.ReservedBedIds.Count}) khong du. Can it nhat {requiredBeds} lo (ReplicationCount={dto.ReplicationCount ?? 1} x Groups={dto.ExpectedGroups ?? 1}).");
+
                     var reservations = dto.ReservedBedIds.Select(bedId => new M.ExperimentBedAssignment
                     {
                         RequestId = requestId,
@@ -268,7 +272,7 @@ public class ExperimentRequestService : IExperimentRequestService
         catch (Exception ex) { throw new Exception($"Xoa yeu cau thuc nghiem that bai: {ex.InnerException?.Message ?? ex.Message}", ex); }
     }
 
-    public async Task<ResourceValidationResultDto?> ValidateResourcesAsync(Guid requestId)
+    public async Task<ResourceValidationResultDto?> ValidateResourcesAsync(Guid requestId, int? replicationCount = null, int? expectedGroups = null)
     {
         try
         {
@@ -295,20 +299,23 @@ public class ExperimentRequestService : IExperimentRequestService
                 UpdatedAt = b.UpdatedAt
             }).ToList();
 
-            bool sufficientBeds = availableBedDtos.Count > 0;
+            int requiredBeds = (replicationCount ?? 1) * (expectedGroups ?? 1);
+            bool sufficientBeds = availableBedDtos.Count >= requiredBeds;
             bool isValid = sufficientBeds;
 
             string? message;
             if (!sufficientBeds)
-                message = $"Farm '{resources.FarmName}' hiện không có beds khả dụng cho thực nghiệm mới (đang có {resources.InUseBeds}/{resources.TotalBeds} beds đang được sử dụng).";
+                message = $"Farm '{resources.FarmName}' khong du beds. Can {requiredBeds} lo (ReplicationCount={replicationCount ?? 1} x Groups={expectedGroups ?? 1}), chi co {availableBedDtos.Count} lo kha dung.";
             else
-                message = $"Farm '{resources.FarmName}' có {availableBedDtos.Count}/{resources.TotalBeds} beds khả dụng cho thực nghiệm.";
+                message = $"Farm '{resources.FarmName}' co {availableBedDtos.Count}/{resources.TotalBeds} beds kha dung. Can {requiredBeds} lo cho thuc nghiem.";
 
             return new ResourceValidationResultDto
             {
                 IsValid = isValid,
                 SufficientBeds = sufficientBeds,
                 SufficientSensors = resources.TotalSensors > 0,
+                RequiredBeds = requiredBeds,
+                AvailableBedCount = availableBedDtos.Count,
                 Message = message,
                 Resources = resources,
                 AvailableBeds = availableBedDtos

@@ -32,6 +32,8 @@ public class ReviewExperimentRequestDto
     public ReviewResult Result { get; set; } = ReviewResult.Approved;
     public string? Comment { get; set; }
     public List<Guid>? ReservedBedIds { get; set; }
+    public int? ReplicationCount { get; set; }
+    public int? ExpectedGroups { get; set; }
 }
 
 public class ExperimentRequestResponseDto
@@ -95,6 +97,8 @@ public class ResourceValidationResultDto
     public bool IsValid { get; set; }
     public bool SufficientBeds { get; set; }
     public bool SufficientSensors { get; set; }
+    public int? RequiredBeds { get; set; }
+    public int AvailableBedCount { get; set; }
     public string? Message { get; set; }
     public FarmResourceSummaryDto? Resources { get; set; }
     public List<BedResponseDto>? AvailableBeds { get; set; }
