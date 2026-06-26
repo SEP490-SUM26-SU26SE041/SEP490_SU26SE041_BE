@@ -890,9 +890,9 @@ public partial class SmartFarmDbContext : DbContext
                 .HasDefaultValueSql("now()")
                 .HasColumnType("timestamp without time zone");
             entity.Property(e => e.DueDate).HasColumnType("timestamp without time zone");
-            entity.Property(e => e.Status).HasColumnType("TaskStatus");
+            entity.Property(e => e.Status).HasColumnName("Status").HasColumnType("TaskStatus");
             entity.Property(e => e.Title).HasMaxLength(150);
-            entity.Property(e => e.Type).HasColumnType("TaskType");
+            entity.Property(e => e.Type).HasColumnName("TaskType").HasColumnType("TaskType");
             entity.Property(e => e.UpdatedAt)
                 .HasDefaultValueSql("now()")
                 .HasColumnType("timestamp without time zone");
