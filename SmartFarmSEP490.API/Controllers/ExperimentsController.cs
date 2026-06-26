@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using SmartFarmSEP490.API.Helpers;
 using SmartFarmSEP490.Model.DTOs;
 using SmartFarmSEP490.Repository.Interfaces.Farms;
 using SmartFarmSEP490.Repository.Interfaces.ExperimentStages;
@@ -102,23 +103,45 @@ public class ExperimentsController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> CreateExperiment([FromBody] CreateExperimentDto dto)
     {
-        if (!ModelState.IsValid) return BadRequest(ModelState);
+        if (!ModelState.IsValid) return BadRequest(new ApiResponse { Success = false, Message = "Du lieu khong hop le." });
         if (!IsResearcher()) return Forbid();
-        var result = await _experimentService.CreateAsync(dto, GetUserId());
-        return CreatedAtAction(nameof(GetExperimentById), new { id = result.Id }, result);
+        try
+        {
+            var result = await _experimentService.CreateAsync(dto, GetUserId());
+            return result == null
+                ? NotFound(new ApiResponse { Success = false, Message = "Khong the tao thuc nghiem." })
+                : StatusCode(201, ApiResponse<ExperimentResponseDto>.Created(result!, "Tao thuc nghiem thanh cong."));
+        }
+        catch (InvalidOperationException ex) { return BadRequest(new ApiResponse { Success = false, Message = ex.Message }); }
+        catch (Exception ex) { return StatusCode(500, new ApiResponse { Success = false, Message = ex.Message }); }
+    }
+
+    [HttpPost("from-request/{requestId:guid}")]
+    public async Task<IActionResult> CreateExperimentFromRequest(Guid requestId)
+    {
+        if (!IsResearcher()) return Forbid();
+        try
+        {
+            var result = await _experimentService.CreateFromRequestAsync(requestId, GetUserId());
+            return result == null
+                ? NotFound(new ApiResponse { Success = false, Message = "Khong the tao thuc nghiem." })
+                : StatusCode(201, ApiResponse<ExperimentResponseDto>.Created(result, "Tao thuc nghiem tu yeu cau thanh cong. Cac lo da duoc chuyen sang trang thai Occupied."));
+        }
+        catch (InvalidOperationException ex) { return BadRequest(new ApiResponse { Success = false, Message = ex.Message }); }
+        catch (Exception ex) { return StatusCode(500, new ApiResponse { Success = false, Message = ex.Message }); }
     }
 
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetExperimentById(Guid id)
     {
         var result = await _experimentService.GetByIdAsync(id);
-        if (result == null) return NotFound();
+        if (result == null) return NotFound(new ApiResponse { Success = false, Message = "Khong tim thay thuc nghiem." });
 
-        if (IsResearcher() && result.ResearcherId == GetUserId()) return Ok(result);
+        if (IsResearcher() && result.ResearcherId == GetUserId()) return Ok(ApiResponse<ExperimentResponseDto>.Ok(result));
         if (IsManager())
         {
             var farm = await _farmRepository.GetByIdAsync(result.FarmId);
-            if (farm != null && farm.ManagerId == GetUserId()) return Ok(result);
+            if (farm != null && farm.ManagerId == GetUserId()) return Ok(ApiResponse<ExperimentResponseDto>.Ok(result));
         }
         return Forbid();
     }
@@ -129,7 +152,7 @@ public class ExperimentsController : ControllerBase
         if (IsResearcher())
         {
             var userId = GetUserId();
-            return Ok(await _experimentService.GetByResearcherAsync(userId));
+            return Ok(ApiResponse<List<ExperimentResponseDto>>.Ok(await _experimentService.GetByResearcherAsync(userId)));
         }
         if (IsManager())
         {
@@ -139,14 +162,14 @@ public class ExperimentsController : ControllerBase
 
             if (farmId.HasValue)
             {
-                if (!myFarmIds.Contains(farmId.Value)) return Ok(new List<ExperimentResponseDto>());
-                return Ok(await _experimentService.GetByFarmAsync(farmId.Value));
+                if (!myFarmIds.Contains(farmId.Value)) return Ok(ApiResponse<List<ExperimentResponseDto>>.Ok(new List<ExperimentResponseDto>()));
+                return Ok(ApiResponse<List<ExperimentResponseDto>>.Ok(await _experimentService.GetByFarmAsync(farmId.Value)));
             }
 
             var results = new List<ExperimentResponseDto>();
             foreach (var fid in myFarmIds)
                 results.AddRange(await _experimentService.GetByFarmAsync(fid));
-            return Ok(results);
+            return Ok(ApiResponse<List<ExperimentResponseDto>>.Ok(results));
         }
         return Forbid();
     }
@@ -154,29 +177,40 @@ public class ExperimentsController : ControllerBase
     [HttpPut("{id:guid}")]
     public async Task<IActionResult> UpdateExperiment(Guid id, [FromBody] UpdateExperimentDto dto)
     {
-        if (!ModelState.IsValid) return BadRequest(ModelState);
+        if (!ModelState.IsValid) return BadRequest(new ApiResponse { Success = false, Message = "Du lieu khong hop le." });
         if (!await IsExperimentOwnerAsync(id)) return Forbid();
-
-        var result = await _experimentService.UpdateAsync(id, dto, GetUserId());
-        return result == null ? NotFound() : Ok(result);
+        try
+        {
+            var result = await _experimentService.UpdateAsync(id, dto, GetUserId());
+            return result == null
+                ? NotFound(new ApiResponse { Success = false, Message = "Khong tim thay thuc nghiem." })
+                : Ok(ApiResponse<ExperimentResponseDto>.Ok(result, "Cap nhat thuc nghiem thanh cong."));
+        }
+        catch (InvalidOperationException ex) { return BadRequest(new ApiResponse { Success = false, Message = ex.Message }); }
+        catch (Exception ex) { return StatusCode(500, new ApiResponse { Success = false, Message = ex.Message }); }
     }
 
     [HttpPatch("{id:guid}/status")]
     public async Task<IActionResult> UpdateStatus(Guid id, [FromBody] UpdateExperimentStatusDto dto)
     {
         if (!await IsExperimentOwnerAsync(id)) return Forbid();
-
-        var result = await _experimentService.UpdateStatusAsync(id, dto.Status, GetUserId());
-        return result == null ? NotFound() : Ok(result);
+        try
+        {
+            var result = await _experimentService.UpdateStatusAsync(id, dto.Status, GetUserId());
+            return result == null
+                ? NotFound(new ApiResponse { Success = false, Message = "Khong tim thay thuc nghiem." })
+                : Ok(ApiResponse<ExperimentResponseDto>.Ok(result, "Cap nhat trang thai thanh cong."));
+        }
+        catch (InvalidOperationException ex) { return BadRequest(new ApiResponse { Success = false, Message = ex.Message }); }
+        catch (Exception ex) { return StatusCode(500, new ApiResponse { Success = false, Message = ex.Message }); }
     }
 
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> DeleteExperiment(Guid id)
     {
         if (!await IsExperimentOwnerAsync(id)) return Forbid();
-
         await _experimentService.DeleteAsync(id);
-        return NoContent();
+        return Ok(new ApiResponse { Success = true, Message = "Xoa thuc nghiem thanh cong." });
     }
 
     // ========== Experiment Stages ==========
@@ -184,11 +218,17 @@ public class ExperimentsController : ControllerBase
     [HttpPost("{experimentId:guid}/stages")]
     public async Task<IActionResult> CreateStage(Guid experimentId, [FromBody] CreateExperimentStageDto dto)
     {
-        if (!ModelState.IsValid) return BadRequest(ModelState);
+        if (!ModelState.IsValid) return BadRequest(new ApiResponse { Success = false, Message = "Du lieu khong hop le." });
         if (!await CanManageExperimentAsync(experimentId)) return Forbid();
-
-        var result = await _stageService.CreateAsync(experimentId, dto);
-        return CreatedAtAction(nameof(GetStageById), new { experimentId, id = result.Id }, result);
+        try
+        {
+            var result = await _stageService.CreateAsync(experimentId, dto);
+            return result == null
+                ? NotFound(new ApiResponse { Success = false, Message = "Khong the tao giai doan." })
+                : StatusCode(201, ApiResponse<ExperimentStageResponseDto>.Created(result, "Tao giai doan thanh cong."));
+        }
+        catch (InvalidOperationException ex) { return BadRequest(new ApiResponse { Success = false, Message = ex.Message }); }
+        catch (Exception ex) { return StatusCode(500, new ApiResponse { Success = false, Message = ex.Message }); }
     }
 
     [HttpGet("{experimentId:guid}/stages/{id:guid}")]
@@ -197,25 +237,29 @@ public class ExperimentsController : ControllerBase
         if (!await CanAccessExperimentAsync(experimentId)) return Forbid();
         var list = await _stageService.GetByExperimentAsync(experimentId);
         var result = list.FirstOrDefault(s => s.Id == id);
-        return result == null ? NotFound() : Ok(result);
+        return result == null ? NotFound(new ApiResponse { Success = false, Message = "Khong tim thay giai doan." }) : Ok(ApiResponse<ExperimentStageResponseDto>.Ok(result));
     }
 
     [HttpGet("{experimentId:guid}/stages")]
     public async Task<IActionResult> GetStagesByExperiment(Guid experimentId)
     {
         if (!await CanAccessExperimentAsync(experimentId)) return Forbid();
-        return Ok(await _stageService.GetByExperimentAsync(experimentId));
+        return Ok(ApiResponse<List<ExperimentStageResponseDto>>.Ok(await _stageService.GetByExperimentAsync(experimentId)));
     }
 
     [HttpPut("stages/{id:guid}")]
     public async Task<IActionResult> UpdateStage(Guid id, [FromBody] UpdateExperimentStageDto dto)
     {
         var stage = await _stageRepository.GetByIdAsync(id);
-        if (stage == null) return NotFound();
+        if (stage == null) return NotFound(new ApiResponse { Success = false, Message = "Khong tim thay giai doan." });
         if (!await CanManageExperimentAsync(stage.ExperimentId)) return Forbid();
-
-        var result = await _stageService.UpdateAsync(id, dto);
-        return result == null ? NotFound() : Ok(result);
+        try
+        {
+            var result = await _stageService.UpdateAsync(id, dto);
+            return result == null ? NotFound(new ApiResponse { Success = false, Message = "Khong the cap nhat giai doan." }) : Ok(ApiResponse<ExperimentStageResponseDto>.Ok(result, "Cap nhat giai doan thanh cong."));
+        }
+        catch (InvalidOperationException ex) { return BadRequest(new ApiResponse { Success = false, Message = ex.Message }); }
+        catch (Exception ex) { return StatusCode(500, new ApiResponse { Success = false, Message = ex.Message }); }
     }
 
     [HttpDelete("stages/{id:guid}")]
@@ -223,9 +267,8 @@ public class ExperimentsController : ControllerBase
     {
         var stage = await _stageRepository.GetByIdAsync(id);
         if (stage != null && !await CanManageExperimentAsync(stage.ExperimentId)) return Forbid();
-
         await _stageService.DeleteAsync(id);
-        return NoContent();
+        return Ok(new ApiResponse { Success = true, Message = "Xoa giai doan thanh cong." });
     }
 
     // ========== Experiment Groups ==========
@@ -233,18 +276,24 @@ public class ExperimentsController : ControllerBase
     [HttpPost("{experimentId:guid}/groups")]
     public async Task<IActionResult> CreateGroup(Guid experimentId, [FromBody] CreateExperimentGroupDto dto)
     {
-        if (!ModelState.IsValid) return BadRequest(ModelState);
+        if (!ModelState.IsValid) return BadRequest(new ApiResponse { Success = false, Message = "Du lieu khong hop le." });
         if (!await CanManageExperimentAsync(experimentId)) return Forbid();
-
-        var result = await _groupService.CreateAsync(experimentId, dto);
-        return CreatedAtAction(nameof(GetGroupById), new { experimentId, id = result.Id }, result);
+        try
+        {
+            var result = await _groupService.CreateAsync(experimentId, dto);
+            return result == null
+                ? NotFound(new ApiResponse { Success = false, Message = "Khong the tao nhom." })
+                : StatusCode(201, ApiResponse<ExperimentGroupResponseDto>.Created(result, "Tao nhom thanh cong."));
+        }
+        catch (InvalidOperationException ex) { return BadRequest(new ApiResponse { Success = false, Message = ex.Message }); }
+        catch (Exception ex) { return StatusCode(500, new ApiResponse { Success = false, Message = ex.Message }); }
     }
 
     [HttpGet("{experimentId:guid}/groups")]
     public async Task<IActionResult> GetGroupsByExperiment(Guid experimentId)
     {
         if (!await CanAccessExperimentAsync(experimentId)) return Forbid();
-        return Ok(await _groupService.GetByExperimentAsync(experimentId));
+        return Ok(ApiResponse<List<ExperimentGroupResponseDto>>.Ok(await _groupService.GetByExperimentAsync(experimentId)));
     }
 
     [HttpGet("{experimentId:guid}/groups/{id:guid}")]
@@ -253,18 +302,22 @@ public class ExperimentsController : ControllerBase
         if (!await CanAccessExperimentAsync(experimentId)) return Forbid();
         var list = await _groupService.GetByExperimentAsync(experimentId);
         var result = list.FirstOrDefault(g => g.Id == id);
-        return result == null ? NotFound() : Ok(result);
+        return result == null ? NotFound(new ApiResponse { Success = false, Message = "Khong tim thay nhom." }) : Ok(ApiResponse<ExperimentGroupResponseDto>.Ok(result));
     }
 
     [HttpPut("groups/{id:guid}")]
     public async Task<IActionResult> UpdateGroup(Guid id, [FromBody] UpdateExperimentGroupDto dto)
     {
         var group = await _groupRepository.GetByIdAsync(id);
-        if (group == null) return NotFound();
+        if (group == null) return NotFound(new ApiResponse { Success = false, Message = "Khong tim thay nhom." });
         if (!await CanManageExperimentAsync(group.ExperimentId)) return Forbid();
-
-        var result = await _groupService.UpdateAsync(id, dto);
-        return result == null ? NotFound() : Ok(result);
+        try
+        {
+            var result = await _groupService.UpdateAsync(id, dto);
+            return result == null ? NotFound(new ApiResponse { Success = false, Message = "Khong the cap nhat nhom." }) : Ok(ApiResponse<ExperimentGroupResponseDto>.Ok(result, "Cap nhat nhom thanh cong."));
+        }
+        catch (InvalidOperationException ex) { return BadRequest(new ApiResponse { Success = false, Message = ex.Message }); }
+        catch (Exception ex) { return StatusCode(500, new ApiResponse { Success = false, Message = ex.Message }); }
     }
 
     [HttpDelete("groups/{id:guid}")]
@@ -272,9 +325,8 @@ public class ExperimentsController : ControllerBase
     {
         var group = await _groupRepository.GetByIdAsync(id);
         if (group != null && !await CanManageExperimentAsync(group.ExperimentId)) return Forbid();
-
         await _groupService.DeleteAsync(id);
-        return NoContent();
+        return Ok(new ApiResponse { Success = true, Message = "Xoa nhom thanh cong." });
     }
 
     // ========== Experiment Design ==========
@@ -283,8 +335,15 @@ public class ExperimentsController : ControllerBase
     public async Task<IActionResult> CreateDesign(Guid experimentId, [FromBody] CreateExperimentDesignDto dto)
     {
         if (!await CanManageExperimentAsync(experimentId)) return Forbid();
-        var result = await _designService.CreateAsync(experimentId, dto);
-        return Ok(result);
+        try
+        {
+            var result = await _designService.CreateAsync(experimentId, dto);
+            return result == null
+                ? NotFound(new ApiResponse { Success = false, Message = "Khong the tao thiet ke." })
+                : StatusCode(201, ApiResponse<ExperimentDesignResponseDto>.Created(result, "Tao thiet ke thanh cong."));
+        }
+        catch (InvalidOperationException ex) { return BadRequest(new ApiResponse { Success = false, Message = ex.Message }); }
+        catch (Exception ex) { return StatusCode(500, new ApiResponse { Success = false, Message = ex.Message }); }
     }
 
     [HttpGet("{experimentId:guid}/design")]
@@ -292,15 +351,20 @@ public class ExperimentsController : ControllerBase
     {
         if (!await CanAccessExperimentAsync(experimentId)) return Forbid();
         var result = await _designService.GetByExperimentAsync(experimentId);
-        return result == null ? NotFound() : Ok(result);
+        return result == null ? NotFound(new ApiResponse { Success = false, Message = "Khong tim thay thiet ke." }) : Ok(ApiResponse<ExperimentDesignResponseDto>.Ok(result));
     }
 
     [HttpPut("{experimentId:guid}/design")]
     public async Task<IActionResult> UpdateDesign(Guid experimentId, [FromBody] UpdateExperimentDesignDto dto)
     {
         if (!await CanManageExperimentAsync(experimentId)) return Forbid();
-        var result = await _designService.UpdateAsync(experimentId, dto);
-        return result == null ? NotFound() : Ok(result);
+        try
+        {
+            var result = await _designService.UpdateAsync(experimentId, dto);
+            return result == null ? NotFound(new ApiResponse { Success = false, Message = "Khong the cap nhat thiet ke." }) : Ok(ApiResponse<ExperimentDesignResponseDto>.Ok(result, "Cap nhat thiet ke thanh cong."));
+        }
+        catch (InvalidOperationException ex) { return BadRequest(new ApiResponse { Success = false, Message = ex.Message }); }
+        catch (Exception ex) { return StatusCode(500, new ApiResponse { Success = false, Message = ex.Message }); }
     }
 
     [HttpDelete("{experimentId:guid}/design")]
@@ -308,7 +372,7 @@ public class ExperimentsController : ControllerBase
     {
         if (!await CanManageExperimentAsync(experimentId)) return Forbid();
         await _designService.DeleteAsync(experimentId);
-        return NoContent();
+        return Ok(new ApiResponse { Success = true, Message = "Xoa thiet ke thanh cong." });
     }
 
     // ========== Measurement Definitions ==========
@@ -316,29 +380,39 @@ public class ExperimentsController : ControllerBase
     [HttpPost("{experimentId:guid}/measurements")]
     public async Task<IActionResult> CreateMeasurement(Guid experimentId, [FromBody] CreateMeasurementDefinitionDto dto)
     {
-        if (!ModelState.IsValid) return BadRequest(ModelState);
+        if (!ModelState.IsValid) return BadRequest(new ApiResponse { Success = false, Message = "Du lieu khong hop le." });
         if (!await CanManageExperimentAsync(experimentId)) return Forbid();
-
-        var result = await _measurementService.CreateAsync(experimentId, dto);
-        return CreatedAtAction(nameof(GetMeasurementById), new { experimentId, id = result.Id }, result);
+        try
+        {
+            var result = await _measurementService.CreateAsync(experimentId, dto);
+            return result == null
+                ? NotFound(new ApiResponse { Success = false, Message = "Khong the tao chi so do luong." })
+                : StatusCode(201, ApiResponse<MeasurementDefinitionResponseDto>.Created(result, "Tao chi so do luong thanh cong."));
+        }
+        catch (InvalidOperationException ex) { return BadRequest(new ApiResponse { Success = false, Message = ex.Message }); }
+        catch (Exception ex) { return StatusCode(500, new ApiResponse { Success = false, Message = ex.Message }); }
     }
 
     [HttpGet("{experimentId:guid}/measurements")]
     public async Task<IActionResult> GetMeasurementsByExperiment(Guid experimentId)
     {
         if (!await CanAccessExperimentAsync(experimentId)) return Forbid();
-        return Ok(await _measurementService.GetByExperimentAsync(experimentId));
+        return Ok(ApiResponse<List<MeasurementDefinitionResponseDto>>.Ok(await _measurementService.GetByExperimentAsync(experimentId)));
     }
 
     [HttpPut("measurements/{id:guid}")]
     public async Task<IActionResult> UpdateMeasurement(Guid id, [FromBody] UpdateMeasurementDefinitionDto dto)
     {
         var m = await _measurementRepository.GetByIdAsync(id);
-        if (m == null) return NotFound();
+        if (m == null) return NotFound(new ApiResponse { Success = false, Message = "Khong tim thay chi so do luong." });
         if (!await CanManageExperimentAsync(m.ExperimentId)) return Forbid();
-
-        var result = await _measurementService.UpdateAsync(id, dto);
-        return result == null ? NotFound() : Ok(result);
+        try
+        {
+            var result = await _measurementService.UpdateAsync(id, dto);
+            return result == null ? NotFound(new ApiResponse { Success = false, Message = "Khong the cap nhat chi so do luong." }) : Ok(ApiResponse<MeasurementDefinitionResponseDto>.Ok(result, "Cap nhat chi so do luong thanh cong."));
+        }
+        catch (InvalidOperationException ex) { return BadRequest(new ApiResponse { Success = false, Message = ex.Message }); }
+        catch (Exception ex) { return StatusCode(500, new ApiResponse { Success = false, Message = ex.Message }); }
     }
 
     [HttpDelete("measurements/{id:guid}")]
@@ -346,9 +420,8 @@ public class ExperimentsController : ControllerBase
     {
         var m = await _measurementRepository.GetByIdAsync(id);
         if (m != null && !await CanManageExperimentAsync(m.ExperimentId)) return Forbid();
-
         await _measurementService.DeleteAsync(id);
-        return NoContent();
+        return Ok(new ApiResponse { Success = true, Message = "Xoa chi so do luong thanh cong." });
     }
 
     private async Task<IActionResult> GetMeasurementById(Guid experimentId, Guid id)
@@ -356,47 +429,51 @@ public class ExperimentsController : ControllerBase
         if (!await CanAccessExperimentAsync(experimentId)) return Forbid();
         var list = await _measurementService.GetByExperimentAsync(experimentId);
         var result = list.FirstOrDefault(m => m.Id == id);
-        return result == null ? NotFound() : Ok(result);
+        return result == null ? NotFound(new ApiResponse { Success = false, Message = "Khong tim thay chi so do luong." }) : Ok(ApiResponse<MeasurementDefinitionResponseDto>.Ok(result));
     }
 
     // ========== Procedure Templates ==========
-    // ProcedureTemplates belong to Researcher, not tied to a specific experiment
 
     [HttpPost("procedure-templates")]
     public async Task<IActionResult> CreateProcedureTemplate([FromBody] CreateProcedureTemplateDto dto)
     {
-        if (!ModelState.IsValid) return BadRequest(ModelState);
+        if (!ModelState.IsValid) return BadRequest(new ApiResponse { Success = false, Message = "Du lieu khong hop le." });
         if (!IsResearcher()) return Forbid();
-
-        var result = await _templateService.CreateAsync(dto, GetUserId());
-        return CreatedAtAction(nameof(GetProcedureTemplateById), new { id = result.Id }, result);
+        try
+        {
+            var result = await _templateService.CreateAsync(dto, GetUserId());
+            return result == null
+                ? NotFound(new ApiResponse { Success = false, Message = "Khong the tao mau quy trinh." })
+                : StatusCode(201, ApiResponse<ProcedureTemplateResponseDto>.Created(result, "Tao mau quy trinh thanh cong."));
+        }
+        catch (InvalidOperationException ex) { return BadRequest(new ApiResponse { Success = false, Message = ex.Message }); }
+        catch (Exception ex) { return StatusCode(500, new ApiResponse { Success = false, Message = ex.Message }); }
     }
 
     [HttpGet("procedure-templates")]
     public async Task<IActionResult> GetAllProcedureTemplates([FromQuery] Guid? cropVarietyId)
     {
         if (!IsManagerOrResearcher()) return Forbid();
-
-        if (cropVarietyId.HasValue) return Ok(await _templateService.GetByCropVarietyAsync(cropVarietyId.Value));
-        return Ok(await _templateService.GetAllAsync());
+        var result = cropVarietyId.HasValue
+            ? await _templateService.GetByCropVarietyAsync(cropVarietyId.Value)
+            : await _templateService.GetAllAsync();
+        return Ok(ApiResponse<List<ProcedureTemplateResponseDto>>.Ok(result));
     }
 
     [HttpGet("procedure-templates/{id:guid}")]
     public async Task<IActionResult> GetProcedureTemplateById(Guid id)
     {
         if (!IsManagerOrResearcher()) return Forbid();
-
         var result = await _templateService.GetByIdAsync(id);
-        return result == null ? NotFound() : Ok(result);
+        return result == null ? NotFound(new ApiResponse { Success = false, Message = "Khong tim thay mau quy trinh." }) : Ok(ApiResponse<ProcedureTemplateResponseDto>.Ok(result));
     }
 
     [HttpDelete("procedure-templates/{id:guid}")]
     public async Task<IActionResult> DeleteProcedureTemplate(Guid id)
     {
         if (!IsResearcher()) return Forbid();
-
         await _templateService.DeleteAsync(id);
-        return NoContent();
+        return Ok(new ApiResponse { Success = true, Message = "Xoa mau quy trinh thanh cong." });
     }
 
     // ========== Care Schedules ==========
@@ -404,29 +481,39 @@ public class ExperimentsController : ControllerBase
     [HttpPost("{experimentId:guid}/schedules")]
     public async Task<IActionResult> CreateSchedule(Guid experimentId, [FromBody] CreateCareScheduleDto dto)
     {
-        if (!ModelState.IsValid) return BadRequest(ModelState);
+        if (!ModelState.IsValid) return BadRequest(new ApiResponse { Success = false, Message = "Du lieu khong hop le." });
         if (!await CanManageExperimentAsync(experimentId)) return Forbid();
-
-        var result = await _scheduleService.CreateAsync(experimentId, dto);
-        return CreatedAtAction(nameof(GetScheduleById), new { experimentId, id = result.Id }, result);
+        try
+        {
+            var result = await _scheduleService.CreateAsync(experimentId, dto);
+            return result == null
+                ? NotFound(new ApiResponse { Success = false, Message = "Khong the tao lich cham soc." })
+                : StatusCode(201, ApiResponse<CareScheduleResponseDto>.Created(result, "Tao lich cham soc thanh cong."));
+        }
+        catch (InvalidOperationException ex) { return BadRequest(new ApiResponse { Success = false, Message = ex.Message }); }
+        catch (Exception ex) { return StatusCode(500, new ApiResponse { Success = false, Message = ex.Message }); }
     }
 
     [HttpGet("{experimentId:guid}/schedules")]
     public async Task<IActionResult> GetSchedulesByExperiment(Guid experimentId)
     {
         if (!await CanAccessExperimentAsync(experimentId)) return Forbid();
-        return Ok(await _scheduleService.GetByExperimentAsync(experimentId));
+        return Ok(ApiResponse<List<CareScheduleResponseDto>>.Ok(await _scheduleService.GetByExperimentAsync(experimentId)));
     }
 
     [HttpPut("schedules/{id:guid}")]
     public async Task<IActionResult> UpdateSchedule(Guid id, [FromBody] UpdateCareScheduleDto dto)
     {
         var schedule = await _careScheduleRepository.GetByIdAsync(id);
-        if (schedule == null) return NotFound();
+        if (schedule == null) return NotFound(new ApiResponse { Success = false, Message = "Khong tim thay lich cham soc." });
         if (!await CanManageExperimentAsync(schedule.ExperimentId)) return Forbid();
-
-        var result = await _scheduleService.UpdateAsync(id, dto);
-        return result == null ? NotFound() : Ok(result);
+        try
+        {
+            var result = await _scheduleService.UpdateAsync(id, dto);
+            return result == null ? NotFound(new ApiResponse { Success = false, Message = "Khong the cap nhat lich cham soc." }) : Ok(ApiResponse<CareScheduleResponseDto>.Ok(result, "Cap nhat lich cham soc thanh cong."));
+        }
+        catch (InvalidOperationException ex) { return BadRequest(new ApiResponse { Success = false, Message = ex.Message }); }
+        catch (Exception ex) { return StatusCode(500, new ApiResponse { Success = false, Message = ex.Message }); }
     }
 
     [HttpDelete("schedules/{id:guid}")]
@@ -434,9 +521,8 @@ public class ExperimentsController : ControllerBase
     {
         var schedule = await _careScheduleRepository.GetByIdAsync(id);
         if (schedule != null && !await CanManageExperimentAsync(schedule.ExperimentId)) return Forbid();
-
         await _scheduleService.DeleteAsync(id);
-        return NoContent();
+        return Ok(new ApiResponse { Success = true, Message = "Xoa lich cham soc thanh cong." });
     }
 
     private async Task<IActionResult> GetScheduleById(Guid experimentId, Guid id)
@@ -444,6 +530,6 @@ public class ExperimentsController : ControllerBase
         if (!await CanAccessExperimentAsync(experimentId)) return Forbid();
         var list = await _scheduleService.GetByExperimentAsync(experimentId);
         var result = list.FirstOrDefault(s => s.Id == id);
-        return result == null ? NotFound() : Ok(result);
+        return result == null ? NotFound(new ApiResponse { Success = false, Message = "Khong tim thay lich cham soc." }) : Ok(ApiResponse<CareScheduleResponseDto>.Ok(result));
     }
 }

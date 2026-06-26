@@ -19,9 +19,8 @@ public class BedRepository : IBedRepository
         await _context.Beds.Where(b => b.AreaId == areaId && b.DeletedAt == null)
             .OrderBy(b => b.BedCode).ToListAsync();
 
-    public async Task<List<M.Bed>> GetAvailableByFarmAsync(Guid farmId) =>
-        await _context.Beds.Include(b => b.Area).Include(b => b.ExperimentBedAssignments)
-            .Where(b => b.Area.FarmId == farmId && b.DeletedAt == null).OrderBy(b => b.BedCode).ToListAsync();
+    public async Task<List<M.Bed>> GetByIdsAsync(List<Guid> bedIds) =>
+        await _context.Beds.Where(b => bedIds.Contains(b.Id)).ToListAsync();
 
     public async Task<M.Bed> CreateAsync(M.Bed entity)
     {

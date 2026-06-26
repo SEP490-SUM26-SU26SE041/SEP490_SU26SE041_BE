@@ -1,38 +1,50 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using SmartFarmSEP490.API.Helpers;
 using SmartFarmSEP490.Model.DTOs;
+using SmartFarmSEP490.Repository.Interfaces.Experiments;
 using SmartFarmSEP490.Service.Interfaces.Resources;
 
 namespace SmartFarmSEP490.API.Controllers;
 
 [Route("api/batches")]
 [ApiController]
-[Authorize(Roles = "Manager")]
+[Authorize]
 public class BatchesController : ControllerBase
 {
     private readonly IBatchService _batchService;
-    private readonly IFarmService _farmService;
-    private readonly IBedService _bedService;
-    private readonly IExperimentBedAssignmentService _assignmentService;
+    private readonly IExperimentRepository _experimentRepository;
 
     public BatchesController(
         IBatchService batchService,
-        IFarmService farmService,
-        IBedService bedService,
-        IExperimentBedAssignmentService assignmentService)
+        IExperimentRepository experimentRepository)
     {
         _batchService = batchService;
-        _farmService = farmService;
-        _bedService = bedService;
-        _assignmentService = assignmentService;
+        _experimentRepository = experimentRepository;
+    }
+
+    private Guid GetUserId() =>
+        Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var id) ? id : Guid.Empty;
+
+    private string? GetRole() => User.FindFirstValue(ClaimTypes.Role);
+
+    private bool IsResearcher() => GetRole() == "Researcher";
+
+    private bool IsManager() => GetRole() == "Manager";
+
+    private async Task<bool> IsExperimentOwnerAsync(Guid experimentId)
+    {
+        var exp = await _experimentRepository.GetByIdAsync(experimentId);
+        if (exp == null) return false;
+        return exp.ResearcherId == GetUserId();
     }
 
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateBatchDto dto)
     {
         if (!ModelState.IsValid) return BadRequest(ModelState);
-        if (!await CanAccessBatchFarmAsync(dto)) return Forbid();
+        if (!IsResearcher()) return Forbid();
+        if (!await IsExperimentOwnerAsync(dto.ExperimentId)) return Forbid();
         try
         {
             var result = await _batchService.CreateAsync(dto);
@@ -46,24 +58,18 @@ public class BatchesController : ControllerBase
     {
         var result = await _batchService.GetByIdAsync(id);
         if (result == null) return NotFound();
-        if (!await CanAccessBatchAsync(result)) return Forbid();
+        if (IsManager()) return Forbid();
+        if (!await IsExperimentOwnerAsync(result.ExperimentId)) return Forbid();
         return Ok(result);
     }
 
     [HttpGet("experiments/{experimentId:guid}")]
     public async Task<IActionResult> GetByExperiment(Guid experimentId)
     {
-        var all = await _batchService.GetByExperimentAsync(experimentId);
-        var userId = this.GetUserId();
-        if (userId == Guid.Empty) return Unauthorized();
-        var myFarms = (await _farmService.GetByManagerAsync(userId)).Select(f => f.Id).ToHashSet();
-        var filtered = new List<BatchResponseDto>();
-        foreach (var b in all)
-        {
-            var farmId = await ResolveFarmIdForBatchAsync(b);
-            if (farmId.HasValue && myFarms.Contains(farmId.Value)) filtered.Add(b);
-        }
-        return Ok(filtered);
+        if (IsManager()) return Ok(new List<BatchResponseDto>());
+        if (!IsResearcher()) return Forbid();
+        if (!await IsExperimentOwnerAsync(experimentId)) return Forbid();
+        return Ok(await _batchService.GetByExperimentAsync(experimentId));
     }
 
     [HttpPut("{id:guid}")]
@@ -71,7 +77,8 @@ public class BatchesController : ControllerBase
     {
         var existing = await _batchService.GetByIdAsync(id);
         if (existing == null) return NotFound();
-        if (!await CanAccessBatchAsync(existing)) return Forbid();
+        if (!IsResearcher()) return Forbid();
+        if (!await IsExperimentOwnerAsync(existing.ExperimentId)) return Forbid();
         var result = await _batchService.UpdateAsync(id, dto);
         return result == null ? NotFound() : Ok(result);
     }
@@ -81,59 +88,9 @@ public class BatchesController : ControllerBase
     {
         var existing = await _batchService.GetByIdAsync(id);
         if (existing == null) return NotFound();
-        if (!await CanAccessBatchAsync(existing)) return Forbid();
+        if (!IsResearcher()) return Forbid();
+        if (!await IsExperimentOwnerAsync(existing.ExperimentId)) return Forbid();
         await _batchService.DeleteAsync(id);
         return NoContent();
-    }
-
-    // Resolve the FarmId that owns a batch through its ExperimentBedAssignment → Bed → Area → Farm
-    private async Task<Guid?> ResolveFarmIdForBatchAsync(BatchResponseDto batch)
-    {
-        if (batch.ExperimentBedAssignmentId.HasValue)
-        {
-            var assignments = await _assignmentService.GetByExperimentAsync(batch.ExperimentId);
-            var a = assignments.FirstOrDefault(x => x.Id == batch.ExperimentBedAssignmentId.Value);
-            if (a != null)
-            {
-                var bed = await _bedService.GetByIdAsync(a.BedId);
-                if (bed != null) return bed.FarmId;
-            }
-        }
-        return null;
-    }
-
-    private async Task<bool> CanAccessBatchAsync(BatchResponseDto batch)
-    {
-        var farmId = await ResolveFarmIdForBatchAsync(batch);
-        if (farmId == null) return false;
-        return await CanAccessFarmInternalAsync(farmId.Value);
-    }
-
-    private async Task<bool> CanAccessBatchFarmAsync(CreateBatchDto dto)
-    {
-        if (dto.ExperimentBedAssignmentId.HasValue)
-        {
-            var assignments = await _assignmentService.GetByExperimentAsync(dto.ExperimentId);
-            var a = assignments.FirstOrDefault(x => x.Id == dto.ExperimentBedAssignmentId.Value);
-            if (a != null)
-            {
-                var bed = await _bedService.GetByIdAsync(a.BedId);
-                if (bed != null) return await CanAccessFarmInternalAsync(bed.FarmId);
-            }
-            return false;
-        }
-        // No assignment: allow creation if the manager owns at least one farm.
-        var userId = this.GetUserId();
-        if (userId == Guid.Empty) return false;
-        var farms = await _farmService.GetByManagerAsync(userId);
-        return farms.Count > 0;
-    }
-
-    private async Task<bool> CanAccessFarmInternalAsync(Guid farmId)
-    {
-        var userId = this.GetUserId();
-        if (userId == Guid.Empty) return false;
-        var farm = await _farmService.GetByIdAsync(farmId);
-        return farm != null && farm.ManagerId == userId;
     }
 }

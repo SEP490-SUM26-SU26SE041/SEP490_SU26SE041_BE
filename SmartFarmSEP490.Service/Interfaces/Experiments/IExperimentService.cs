@@ -5,6 +5,7 @@ namespace SmartFarmSEP490.Service.Interfaces.Experiments;
 public interface IExperimentService
 {
     Task<ExperimentResponseDto?> CreateAsync(CreateExperimentDto dto, Guid researcherId);
+    Task<ExperimentResponseDto?> CreateFromRequestAsync(Guid requestId, Guid researcherId);
     Task<ExperimentResponseDto?> UpdateAsync(Guid id, UpdateExperimentDto dto, Guid researcherId);
     Task<ExperimentResponseDto?> UpdateStatusAsync(Guid id, string status, Guid researcherId);
     Task<ExperimentResponseDto?> GetByIdAsync(Guid id);

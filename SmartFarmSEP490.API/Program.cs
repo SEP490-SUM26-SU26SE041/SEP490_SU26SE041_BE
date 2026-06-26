@@ -75,6 +75,7 @@ System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler.DefaultMapInboundClaims 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")!;
 var dataSourceBuilder = new NpgsqlDataSourceBuilder(connectionString);
 dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.AIReviewStatus>("AIReviewStatus", new NpgsqlNullNameTranslator());
+dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.AllocationStatus>("AllocationStatus", new NpgsqlNullNameTranslator());
 dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.AlertSeverity>("AlertSeverity", new NpgsqlNullNameTranslator());
 dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.BatchStatus>("BatchStatus", new NpgsqlNullNameTranslator());
 dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.DesignType>("DesignType", new NpgsqlNullNameTranslator());

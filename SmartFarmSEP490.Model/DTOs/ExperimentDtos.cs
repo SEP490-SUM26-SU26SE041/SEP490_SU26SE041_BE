@@ -92,7 +92,7 @@ public class ExperimentStageResponseDto
     public string? ResultData { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
-    public ExperimentStageType StageType { get; set; }
+    public string StageType { get; set; } = string.Empty;
 }
 
 // ============ ExperimentGroup DTOs ============
@@ -101,12 +101,14 @@ public class CreateExperimentGroupDto
 {
     public string GroupName { get; set; } = string.Empty;
     public string? TreatmentDescription { get; set; }
+    public GroupType GroupType { get; set; } = GroupType.Control;
 }
 
 public class UpdateExperimentGroupDto
 {
     public string? GroupName { get; set; }
     public string? TreatmentDescription { get; set; }
+    public GroupType? GroupType { get; set; }
 }
 
 public class ExperimentGroupResponseDto
@@ -114,6 +116,7 @@ public class ExperimentGroupResponseDto
     public Guid Id { get; set; }
     public string GroupName { get; set; } = string.Empty;
     public string? TreatmentDescription { get; set; }
+    public string GroupType { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; }
 }
 
@@ -121,6 +124,7 @@ public class ExperimentGroupResponseDto
 
 public class CreateExperimentDesignDto
 {
+    public DesignType DesignType { get; set; } = DesignType.Other;
     public int? ReplicationCount { get; set; }
     public string? RandomizationMethod { get; set; }
     public string? DesignParameters { get; set; }
@@ -128,6 +132,7 @@ public class CreateExperimentDesignDto
 
 public class UpdateExperimentDesignDto
 {
+    public DesignType? DesignType { get; set; }
     public int? ReplicationCount { get; set; }
     public string? RandomizationMethod { get; set; }
     public string? DesignParameters { get; set; }
@@ -136,6 +141,7 @@ public class UpdateExperimentDesignDto
 public class ExperimentDesignResponseDto
 {
     public Guid Id { get; set; }
+    public string DesignType { get; set; } = string.Empty;
     public int? ReplicationCount { get; set; }
     public string? RandomizationMethod { get; set; }
     public string? DesignParameters { get; set; }
@@ -223,7 +229,7 @@ public class ProcedureTemplateStepResponseDto
     public string Instruction { get; set; } = string.Empty;
     public int? ExpectedDurationDays { get; set; }
     public string? RequiredSkillDescription { get; set; }
-    public ExperimentStageType StageType { get; set; }
+    public string StageType { get; set; } = string.Empty;
 }
 
 // ============ CareSchedule DTOs ============

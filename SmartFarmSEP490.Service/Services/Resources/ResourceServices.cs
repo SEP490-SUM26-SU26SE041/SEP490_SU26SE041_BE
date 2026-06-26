@@ -111,6 +111,7 @@ public class FarmService : SvcInterfaces.IFarmService
                 FarmId = a.FarmId,
                 CreatedAt = a.CreatedAt,
                 UpdatedAt = a.UpdatedAt,
+                Status = a.Status.ToString(),
                 Beds = (a.Beds ?? new List<M.Bed>())
                     .Where(b => b.DeletedAt == null)
                     .Select(b => new BedResponseDto
@@ -120,6 +121,7 @@ public class FarmService : SvcInterfaces.IFarmService
                         SoilDescription = b.SoilDescription,
                         Length = b.Length,
                         Width = b.Width,
+                        AllocationStatus = null,
                         AreaId = b.AreaId,
                         AreaName = a.AreaName,
                         FarmId = a.FarmId,
@@ -199,7 +201,7 @@ public class AreaService : SvcInterfaces.IAreaService
         AreaName = a.AreaName,
         EnvironmentType = a.EnvironmentType,
         TotalArea = a.TotalArea,
-        Status = a.Status,
+        Status = a.Status.ToString(),
         CreatedAt = a.CreatedAt,
         UpdatedAt = a.UpdatedAt,
         Beds = (a.Beds ?? new List<M.Bed>())
@@ -211,6 +213,7 @@ public class AreaService : SvcInterfaces.IAreaService
                 SoilDescription = b.SoilDescription,
                 Length = b.Length,
                 Width = b.Width,
+                AllocationStatus = null,
                 AreaId = b.AreaId,
                 AreaName = a.AreaName,
                 FarmId = a.FarmId,
@@ -223,7 +226,12 @@ public class AreaService : SvcInterfaces.IAreaService
 public class BedService : SvcInterfaces.IBedService
 {
     private readonly IBedRepository _bedRepository;
-    public BedService(IBedRepository bedRepository) => _bedRepository = bedRepository;
+    private readonly IExperimentBedAssignmentRepository _bedAssignmentRepository;
+    public BedService(IBedRepository bedRepository, IExperimentBedAssignmentRepository bedAssignmentRepository)
+    {
+        _bedRepository = bedRepository;
+        _bedAssignmentRepository = bedAssignmentRepository;
+    }
 
     public async Task<BedResponseDto?> CreateAsync(CreateBedDto dto)
     {
@@ -242,7 +250,7 @@ public class BedService : SvcInterfaces.IBedService
         }
         catch (DbUpdateException dbEx)
         {
-            throw new InvalidOperationException($"Tao luong that bai: {dbEx.InnerException?.Message ?? dbEx.Message}", dbEx);
+            throw new InvalidOperationException($"Tao lo that bai: {dbEx.InnerException?.Message ?? dbEx.Message}", dbEx);
         }
     }
 
@@ -272,6 +280,7 @@ public class BedService : SvcInterfaces.IBedService
             SoilDescription = entity.SoilDescription,
             Length = entity.Length,
             Width = entity.Width,
+            AllocationStatus = null,
             CreatedAt = entity.CreatedAt,
             UpdatedAt = entity.UpdatedAt
         };
@@ -284,10 +293,13 @@ public class BedService : SvcInterfaces.IBedService
         {
             Id = b.Id,
             AreaId = b.AreaId,
+            AreaName = b.Area?.AreaName,
+            FarmId = b.Area?.FarmId ?? Guid.Empty,
             BedCode = b.BedCode,
             SoilDescription = b.SoilDescription,
             Length = b.Length,
             Width = b.Width,
+            AllocationStatus = null,
             CreatedAt = b.CreatedAt,
             UpdatedAt = b.UpdatedAt
         }).ToList();
@@ -295,8 +307,9 @@ public class BedService : SvcInterfaces.IBedService
 
     public async Task<List<BedResponseDto>> GetAvailableByFarmAsync(Guid farmId)
     {
-        var entities = await _bedRepository.GetAvailableByFarmAsync(farmId);
-        return entities.Select(b => new BedResponseDto
+        var availableBedIds = await _bedAssignmentRepository.GetAvailableBedIdsByFarmAsync(farmId);
+        var beds = await _bedRepository.GetByIdsAsync(availableBedIds);
+        return beds.Select(b => new BedResponseDto
         {
             Id = b.Id,
             AreaId = b.AreaId,
@@ -306,8 +319,22 @@ public class BedService : SvcInterfaces.IBedService
             SoilDescription = b.SoilDescription,
             Length = b.Length,
             Width = b.Width,
+            AllocationStatus = "Available",
             CreatedAt = b.CreatedAt,
             UpdatedAt = b.UpdatedAt
+        }).ToList();
+    }
+
+    public async Task<List<BedResponseDto>> GetReservedByRequestAsync(Guid requestId)
+    {
+        var assignments = await _bedAssignmentRepository.GetByRequestAsync(requestId);
+        return assignments.Select(a => new BedResponseDto
+        {
+            Id = a.Bed.Id, BedCode = a.Bed.BedCode, SoilDescription = a.Bed.SoilDescription,
+            Length = a.Bed.Length, Width = a.Bed.Width, AllocationStatus = a.Status.ToString(),
+            AreaId = a.Bed.AreaId, AreaName = a.Bed.Area?.AreaName,
+            FarmId = a.Bed.Area?.FarmId ?? Guid.Empty,
+            CreatedAt = a.Bed.CreatedAt, UpdatedAt = a.Bed.UpdatedAt
         }).ToList();
     }
 
@@ -330,12 +357,22 @@ public class ExperimentBedAssignmentService : SvcInterfaces.IExperimentBedAssign
     {
         try
         {
+            if (dto.RequestId.HasValue && dto.RequestId.Value != Guid.Empty)
+            {
+                await _assignmentRepository.UpdateOrCreateAssignmentAsync(
+                    dto.RequestId.Value, dto.BedId, dto.ExperimentId, dto.AssignedFrom, dto.Purpose);
+                var updated = await _assignmentRepository.GetByRequestAsync(dto.RequestId.Value);
+                var saved = updated.FirstOrDefault(a => a.BedId == dto.BedId);
+                return saved == null ? null : MapToDto(saved);
+            }
+
             var active = await _assignmentRepository.GetActiveByBedAsync(dto.BedId);
             if (active != null)
                 throw new InvalidOperationException($"Luong {dto.BedId} dang co phan cong thuc nghiem khac (chua ket thuc).");
 
             var entity = new M.ExperimentBedAssignment
             {
+                RequestId = dto.RequestId,
                 ExperimentId = dto.ExperimentId,
                 BedId = dto.BedId,
                 AssignedFrom = dto.AssignedFrom,
@@ -392,10 +429,12 @@ public class ExperimentBedAssignmentService : SvcInterfaces.IExperimentBedAssign
     private static ExperimentBedAssignmentResponseDto MapToDto(M.ExperimentBedAssignment e) => new()
     {
         Id = e.Id,
+        RequestId = e.RequestId,
         ExperimentId = e.ExperimentId,
         ExperimentTitle = e.Experiment?.Title,
         BedId = e.BedId,
         BedCode = e.Bed?.BedCode,
+        AllocationStatus = e.Status.ToString(),
         AreaName = e.Bed?.Area?.AreaName,
         FarmName = e.Bed?.Area?.Farm?.FarmName,
         AssignedFrom = e.AssignedFrom,
@@ -446,6 +485,7 @@ public class BatchService : SvcInterfaces.IBatchService
         if (dto.ExpectedHarvestDate.HasValue) entity.ExpectedHarvestDate = dto.ExpectedHarvestDate;
         if (dto.PlantCount.HasValue) entity.PlantCount = dto.PlantCount;
         if (dto.Notes != null) entity.Notes = dto.Notes;
+        if (dto.Status != null) entity.Status = Enum.Parse<SmartFarmSEP490.Model.Enums.BatchStatus>(dto.Status);
         await _batchRepository.UpdateAsync(entity);
         return await GetByIdAsync(id);
     }
@@ -478,6 +518,7 @@ public class BatchService : SvcInterfaces.IBatchService
         ExpectedHarvestDate = b.ExpectedHarvestDate,
         PlantCount = b.PlantCount,
         Notes = b.Notes,
+        Status = null,
         CreatedAt = b.CreatedAt,
         ExperimentId = b.ExperimentId,
         ExperimentTitle = b.Experiment?.Title,

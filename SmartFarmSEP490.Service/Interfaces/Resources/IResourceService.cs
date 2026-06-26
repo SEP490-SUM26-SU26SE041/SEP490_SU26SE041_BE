@@ -29,6 +29,7 @@ public interface IBedService
     Task<BedResponseDto?> GetByIdAsync(Guid id);
     Task<List<BedResponseDto>> GetByAreaAsync(Guid areaId);
     Task<List<BedResponseDto>> GetAvailableByFarmAsync(Guid farmId);
+    Task<List<BedResponseDto>> GetReservedByRequestAsync(Guid requestId);
     Task<bool> DeleteAsync(Guid id);
 }
 
