@@ -12,12 +12,34 @@ public class CareScheduleRepository : ICareScheduleRepository
     public CareScheduleRepository(SmartFarmDbContext context) => _context = context;
 
     public async Task<M.CareSchedule?> GetByIdAsync(Guid id) =>
-        await _context.CareSchedules.Include(c => c.ExperimentStage).Include(c => c.Batch)
+        await _context.CareSchedules
+            .Include(c => c.ExperimentStage)
+            .Include(c => c.Batch)
             .FirstOrDefaultAsync(c => c.Id == id);
 
     public async Task<List<M.CareSchedule>> GetByExperimentAsync(Guid experimentId) =>
-        await _context.CareSchedules.Include(c => c.ExperimentStage).Include(c => c.Batch)
-            .Where(c => c.ExperimentId == experimentId).OrderBy(c => c.StartDate).ToListAsync();
+        await _context.CareSchedules
+            .Include(c => c.ExperimentStage)
+            .Include(c => c.Batch)
+            .Where(c => c.ExperimentId == experimentId)
+            .OrderBy(c => c.StartDate)
+            .ToListAsync();
+
+    public async Task<List<M.CareSchedule>> GetByStageAsync(Guid stageId) =>
+        await _context.CareSchedules
+            .Include(c => c.ExperimentStage)
+            .Include(c => c.Batch)  
+            .Where(c => c.ExperimentStageId == stageId)
+            .OrderBy(c => c.StartDate)
+            .ToListAsync();
+
+    public async Task<List<M.CareSchedule>> GetByStageAndBatchAsync(Guid stageId, Guid batchId) =>
+        await _context.CareSchedules
+            .Include(c => c.ExperimentStage)
+            .Include(c => c.Batch)
+            .Where(c => c.ExperimentStageId == stageId && c.BatchId == batchId)
+            .OrderBy(c => c.StartDate)
+            .ToListAsync();
 
     public async Task<M.CareSchedule> CreateAsync(M.CareSchedule entity)
     {

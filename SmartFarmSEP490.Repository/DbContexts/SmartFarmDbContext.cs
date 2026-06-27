@@ -285,6 +285,7 @@ public partial class SmartFarmDbContext : DbContext
             entity.Property(e => e.CreatedAt)
                 .HasDefaultValueSql("now()")
                 .HasColumnType("timestamp without time zone");
+            entity.Property(e => e.TaskType).HasColumnType("TaskType");
             entity.Property(e => e.Title).HasMaxLength(150);
 
             entity.HasOne(d => d.Batch).WithMany(p => p.CareSchedules)

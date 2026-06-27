@@ -141,7 +141,13 @@ builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<ITaskRepository, TaskRepository>();
 builder.Services.AddScoped<ITaskAssignmentRepository, TaskAssignmentRepository>();
 builder.Services.AddScoped<ITaskSkillRequirementRepository, TaskSkillRequirementRepository>();
+builder.Services.AddScoped<ITaskReportRepository, TaskReportRepository>();
+builder.Services.AddScoped<IMeasurementRecordRepository, MeasurementRecordRepository>();
+builder.Services.AddScoped<IPlantImageRepository, PlantImageRepository>();
 builder.Services.AddScoped<ITaskService, TaskService>();
+builder.Services.AddScoped<ITaskReportService, TaskReportService>();
+builder.Services.AddScoped<IMeasurementRecordService, MeasurementRecordService>();
+builder.Services.AddScoped<ITaskImageService, TaskImageService>();
 
 var jwtSettings = builder.Configuration.GetSection("Jwt");
 var key = Encoding.UTF8.GetBytes(jwtSettings["Key"]!);

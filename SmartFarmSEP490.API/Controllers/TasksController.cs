@@ -42,7 +42,32 @@ public class TasksController : ControllerBase
         return await IsExperimentOwnerAsync(task.ExperimentId);
     }
 
-    // ========== Tasks CRUD ==========
+    // ========== Task Generation ==========
+
+    /// <summary>
+    /// Sinh task tu CareSchedule cua 1 Stage.
+    /// </summary>
+    [HttpPost("generate-by-stage/{stageId:guid}")]
+    public async Task<IActionResult> GenerateByStage(Guid stageId)
+    {
+        if (!IsResearcher()) return Forbid();
+        var result = await _taskService.GenerateByStageAsync(stageId, GetUserId());
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Sinh toan bo task cua Experiment (tat ca Stage -> CareSchedule).
+    /// </summary>
+    [HttpPost("generate-by-experiment/{experimentId:guid}")]
+    public async Task<IActionResult> GenerateByExperiment(Guid experimentId)
+    {
+        if (!IsResearcher()) return Forbid();
+        if (!await IsExperimentOwnerAsync(experimentId)) return Forbid();
+        var result = await _taskService.GenerateByExperimentAsync(experimentId, GetUserId());
+        return Ok(result);
+    }
+
+    // ========== Task CRUD ==========
 
     [HttpPost]
     public async Task<IActionResult> CreateTask([FromBody] CreateTaskDto dto)
@@ -105,8 +130,134 @@ public class TasksController : ControllerBase
         return NoContent();
     }
 
+    // ========== Task Filter ==========
+
+    /// <summary>
+    /// Get Tasks By Experiment
+    /// </summary>
+    [HttpGet("experiment/{experimentId:guid}")]
+    public async Task<IActionResult> GetByExperiment(Guid experimentId)
+    {
+        if (!await IsExperimentOwnerAsync(experimentId)) return Forbid();
+        return Ok(await _taskService.GetByExperimentAsync(experimentId));
+    }
+
+    /// <summary>
+    /// Get Tasks By Stage
+    /// </summary>
+    [HttpGet("stage/{stageId:guid}")]
+    public async Task<IActionResult> GetByStage(Guid stageId)
+    {
+        return Ok(await _taskService.GetByStageAsync(stageId));
+    }
+
+    /// <summary>
+    /// Get Tasks By Batch
+    /// </summary>
+    [HttpGet("batch/{batchId:guid}")]
+    public async Task<IActionResult> GetByBatch(Guid batchId)
+    {
+        return Ok(await _taskService.GetByBatchAsync(batchId));
+    }
+
+    /// <summary>
+    /// Get Tasks By User
+    /// </summary>
+    [HttpGet("user/{userId:guid}")]
+    public async Task<IActionResult> GetByUser(Guid userId)
+    {
+        if (!IsResearcher()) return Forbid();
+        return Ok(await _taskService.GetByAssigneeAsync(userId));
+    }
+
+    /// <summary>
+    /// Get My Tasks - JWT User
+    /// </summary>
+    [HttpGet("my")]
+    public async Task<IActionResult> GetMyTasks()
+    {
+        return Ok(await _taskService.GetByAssigneeAsync(GetUserId()));
+    }
+
+    /// <summary>
+    /// Get Today Tasks - Mobile dùng nhiều nhất
+    /// </summary>
+    [HttpGet("today")]
+    public async Task<IActionResult> GetTodayTasks()
+    {
+        return Ok(await _taskService.GetTodayTasksAsync(GetUserId()));
+    }
+
+    /// <summary>
+    /// Get Upcoming Tasks
+    /// </summary>
+    [HttpGet("upcoming")]
+    public async Task<IActionResult> GetUpcomingTasks([FromQuery] int days = 7)
+    {
+        return Ok(await _taskService.GetUpcomingTasksAsync(GetUserId(), days));
+    }
+
+    /// <summary>
+    /// Get Overdue Tasks
+    /// </summary>
+    [HttpGet("overdue")]
+    public async Task<IActionResult> GetOverdueTasks()
+    {
+        return Ok(await _taskService.GetOverdueTasksAsync(GetUserId()));
+    }
+
     // ========== Task Status ==========
 
+    /// <summary>
+    /// Start Task: Pending -> InProgress
+    /// </summary>
+    [HttpPatch("{id:guid}/start")]
+    public async Task<IActionResult> StartTask(Guid id)
+    {
+        var task = await _taskService.GetByIdAsync(id);
+        if (task == null) return NotFound();
+
+        var hasAccess = task.AssignedTo.HasValue && task.AssignedTo.Value == GetUserId();
+        if (!hasAccess) return Forbid();
+
+        var result = await _taskService.UpdateTaskStatusAsync(id, "InProgress", GetUserId());
+        return result == null ? NotFound() : Ok(result);
+    }
+
+    /// <summary>
+    /// Complete Task: InProgress -> Completed
+    /// </summary>
+    [HttpPatch("{id:guid}/complete")]
+    public async Task<IActionResult> CompleteTask(Guid id)
+    {
+        var task = await _taskService.GetByIdAsync(id);
+        if (task == null) return NotFound();
+
+        var hasAccess = task.AssignedTo.HasValue && task.AssignedTo.Value == GetUserId();
+        if (!hasAccess) return Forbid();
+
+        var result = await _taskService.UpdateTaskStatusAsync(id, "Completed", GetUserId());
+        return result == null ? NotFound() : Ok(result);
+    }
+
+    /// <summary>
+    /// Cancel Task
+    /// </summary>
+    [HttpPatch("{id:guid}/cancel")]
+    public async Task<IActionResult> CancelTask(Guid id)
+    {
+        var task = await _taskService.GetByIdAsync(id);
+        if (task == null) return NotFound();
+
+        if (!await IsExperimentOwnerAsync(task.ExperimentId)) return Forbid();
+
+        var result = await _taskService.UpdateTaskStatusAsync(id, "Cancelled", GetUserId());
+        return result == null ? NotFound() : Ok(result);
+    }
+
+    /// <summary>
+    /// Update Status (generic)
+    /// </summary>
     [HttpPatch("{id:guid}/status")]
     public async Task<IActionResult> UpdateTaskStatus(Guid id, [FromBody] UpdateExperimentStatusDto dto)
     {
@@ -122,9 +273,6 @@ public class TasksController : ControllerBase
 
     // ========== Task Assignment ==========
 
-    /// <summary>
-    /// Gan mot task cho mot nguoi dung (Technician/Student) co kiem tra skill.
-    /// </summary>
     [HttpPost("assign")]
     public async Task<IActionResult> AssignTask([FromBody] AssignTaskDto dto)
     {
@@ -142,9 +290,6 @@ public class TasksController : ControllerBase
             : Ok(result);
     }
 
-    /// <summary>
-    /// Chuyen giao task tu nguoi dung hien tai sang nguoi dung khac.
-    /// </summary>
     [HttpPost("reassign")]
     public async Task<IActionResult> ReassignTask([FromBody] ReassignTaskDto dto)
     {
@@ -162,22 +307,15 @@ public class TasksController : ControllerBase
             : Ok(result);
     }
 
-    /// <summary>
-    /// Cap nhat trang thai assignment (Assigned -> Completed/Cancelled/Resigned).
-    /// </summary>
     [HttpPatch("assignments/status")]
     public async Task<IActionResult> UpdateAssignmentStatus([FromBody] UpdateTaskAssignmentStatusDto dto)
     {
         if (!ModelState.IsValid) return BadRequest(ModelState);
 
-        var assignment = await _taskService.GetTaskAssignmentsAsync(dto.AssignmentId == Guid.Empty ? Guid.Empty : dto.AssignmentId);
         var result = await _taskService.UpdateAssignmentStatusAsync(dto);
         return result == null ? NotFound("Assignment not found.") : Ok(result);
     }
 
-    /// <summary>
-    /// Lay danh sach assignment cua mot task.
-    /// </summary>
     [HttpGet("{taskId:guid}/assignments")]
     public async Task<IActionResult> GetTaskAssignments(Guid taskId)
     {
@@ -189,22 +327,14 @@ public class TasksController : ControllerBase
         return Ok(await _taskService.GetTaskAssignmentsAsync(taskId));
     }
 
-    /// <summary>
-    /// Lay tat ca assignment cua mot nguoi dung.
-    /// </summary>
     [HttpGet("assignments/my")]
     public async Task<IActionResult> GetMyAssignments()
     {
-        var userId = GetUserId();
-        return Ok(await _taskService.GetAssignmentsByAssigneeAsync(userId));
+        return Ok(await _taskService.GetAssignmentsByAssigneeAsync(GetUserId()));
     }
 
     // ========== Skill Matching ==========
 
-    /// <summary>
-    /// Tim danh sach nguoi dung phu hop voi task dua tren skill requirements.
-    /// Chi tra ve Technician va Student co skill phu hop.
-    /// </summary>
     [HttpGet("{taskId:guid}/skill-matches")]
     public async Task<IActionResult> FindSkillMatches(Guid taskId)
     {
