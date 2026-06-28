@@ -736,6 +736,7 @@ public class CareScheduleService : ICareScheduleService
                 ExperimentStageId = dto.ExperimentStageId,
                 BatchId = dto.BatchId,
                 Title = dto.Title,
+                TaskType = dto.TaskType,
                 Instruction = dto.Instruction,
                 FrequencyDays = dto.FrequencyDays,
                 StartDate = dto.StartDate,
@@ -757,6 +758,7 @@ public class CareScheduleService : ICareScheduleService
             if (dto.ExperimentStageId.HasValue) entity.ExperimentStageId = dto.ExperimentStageId;
             if (dto.BatchId.HasValue) entity.BatchId = dto.BatchId;
             if (dto.Title != null) entity.Title = dto.Title;
+            if (dto.TaskType != null) entity.TaskType = dto.TaskType;
             if (dto.Instruction != null) entity.Instruction = dto.Instruction;
             if (dto.FrequencyDays.HasValue) entity.FrequencyDays = dto.FrequencyDays;
             if (dto.StartDate.HasValue) entity.StartDate = dto.StartDate.Value;

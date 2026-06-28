@@ -240,6 +240,7 @@ public class CreateCareScheduleDto
     public Guid? BatchId { get; set; }
     public string Title { get; set; } = string.Empty;
     public string? Instruction { get; set; }
+    public TaskType TaskType { get; set; }
     public int? FrequencyDays { get; set; }
     public DateOnly StartDate { get; set; }
     public DateOnly? EndDate { get; set; }
@@ -251,6 +252,7 @@ public class UpdateCareScheduleDto
     public Guid? BatchId { get; set; }
     public string? Title { get; set; }
     public string? Instruction { get; set; }
+    public TaskType TaskType { get; set; }
     public int? FrequencyDays { get; set; }
     public DateOnly? StartDate { get; set; }
     public DateOnly? EndDate { get; set; }
@@ -261,6 +263,7 @@ public class CareScheduleResponseDto
     public Guid Id { get; set; }
     public string Title { get; set; } = string.Empty;
     public string? Instruction { get; set; }
+    public TaskType TaskType { get; set; }
     public int? FrequencyDays { get; set; }
     public DateOnly StartDate { get; set; }
     public DateOnly? EndDate { get; set; }
