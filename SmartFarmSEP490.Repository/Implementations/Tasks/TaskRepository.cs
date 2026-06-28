@@ -2,21 +2,17 @@ using Microsoft.EntityFrameworkCore;
 using SmartFarmSEP490.Model;
 using SmartFarmSEP490.Repository.DbContexts;
 using SmartFarmSEP490.Repository.Interfaces.Tasks;
+using Task = System.Threading.Tasks.Task;
 
 namespace SmartFarmSEP490.Repository.Implementations.Tasks;
 
 public class TaskRepository : ITaskRepository
 {
     private readonly SmartFarmDbContext _context;
+    public TaskRepository(SmartFarmDbContext context) => _context = context;
 
-    public TaskRepository(SmartFarmDbContext context)
-    {
-        _context = context;
-    }
-
-    public async System.Threading.Tasks.Task<Model.Task?> GetByIdAsync(Guid id)
-    {
-        return await _context.Tasks
+    private IQueryable<Model.Task> FullQuery() =>
+        _context.Tasks
             .Include(t => t.Experiment)
             .Include(t => t.ExperimentStage)
             .Include(t => t.Batch)
@@ -31,67 +27,95 @@ public class TaskRepository : ITaskRepository
                         .ThenInclude(ur => ur.Role)
             .Include(t => t.TaskAssignments)
                 .ThenInclude(ta => ta.AssignedByNavigation)
-            .FirstOrDefaultAsync(t => t.Id == id);
-    }
+            .Include(t => t.TaskReports)
+                .ThenInclude(tr => tr.Reporter)
+            .Include(t => t.TaskReports)
+                .ThenInclude(tr => tr.PlantImages);
 
-    public async System.Threading.Tasks.Task<List<Model.Task>> GetByExperimentAsync(Guid experimentId)
-    {
-        return await _context.Tasks
-            .Include(t => t.Experiment)
-            .Include(t => t.ExperimentStage)
-            .Include(t => t.Batch)
-            .Include(t => t.CreatedByNavigation)
-            .Include(t => t.AssignedToNavigation)
-            .Include(t => t.TaskSkillRequirements)
-                .ThenInclude(tsr => tsr.Skill)
+    public async Task<Model.Task?> GetByIdAsync(Guid id) =>
+        await FullQuery().FirstOrDefaultAsync(t => t.Id == id);
+
+    public async Task<List<Model.Task>> GetByExperimentAsync(Guid experimentId) =>
+        await FullQuery()
             .Where(t => t.ExperimentId == experimentId)
             .OrderByDescending(t => t.CreatedAt)
             .ToListAsync();
-    }
 
-    public async System.Threading.Tasks.Task<List<Model.Task>> GetByAssigneeAsync(Guid assigneeId)
-    {
-        return await _context.Tasks
-            .Include(t => t.Experiment)
-            .Include(t => t.ExperimentStage)
-            .Include(t => t.Batch)
-            .Include(t => t.CreatedByNavigation)
-            .Include(t => t.AssignedToNavigation)
-            .Include(t => t.TaskSkillRequirements)
-                .ThenInclude(tsr => tsr.Skill)
+    public async Task<List<Model.Task>> GetByStageAsync(Guid stageId) =>
+        await FullQuery()
+            .Where(t => t.ExperimentStageId == stageId)
+            .OrderByDescending(t => t.CreatedAt)
+            .ToListAsync();
+
+    public async Task<List<Model.Task>> GetByBatchAsync(Guid batchId) =>
+        await FullQuery()
+            .Where(t => t.BatchId == batchId)
+            .OrderByDescending(t => t.CreatedAt)
+            .ToListAsync();
+
+    public async Task<List<Model.Task>> GetByAssigneeAsync(Guid assigneeId) =>
+        await FullQuery()
             .Where(t => t.AssignedTo == assigneeId)
             .OrderByDescending(t => t.DueDate)
             .ToListAsync();
-    }
 
-    public async System.Threading.Tasks.Task<List<Model.Task>> GetAllAsync()
-    {
-        return await _context.Tasks
-            .Include(t => t.Experiment)
-            .Include(t => t.ExperimentStage)
-            .Include(t => t.Batch)
-            .Include(t => t.CreatedByNavigation)
-            .Include(t => t.AssignedToNavigation)
-            .Include(t => t.TaskSkillRequirements)
-                .ThenInclude(tsr => tsr.Skill)
+    public async Task<List<Model.Task>> GetAllAsync() =>
+        await FullQuery()
             .OrderByDescending(t => t.CreatedAt)
+            .ToListAsync();
+
+    public async Task<List<Model.Task>> GetTodayTasksAsync(Guid assigneeId)
+    {
+        var today = DateTime.UtcNow.Date;
+        var tomorrow = today.AddDays(1);
+        return await FullQuery()
+            .Where(t => t.AssignedTo == assigneeId
+                && t.DueDate.HasValue
+                && t.DueDate.Value >= today
+                && t.DueDate.Value < tomorrow)
+            .OrderBy(t => t.DueDate)
             .ToListAsync();
     }
 
-    public async System.Threading.Tasks.Task<Model.Task> AddAsync(Model.Task task)
+    public async Task<List<Model.Task>> GetUpcomingTasksAsync(Guid assigneeId, int days)
+    {
+        var today = DateTime.UtcNow.Date;
+        var future = today.AddDays(days);
+        return await FullQuery()
+            .Where(t => t.AssignedTo == assigneeId
+                && t.DueDate.HasValue
+                && t.DueDate.Value >= today
+                && t.DueDate.Value <= future)
+            .OrderBy(t => t.DueDate)
+            .ToListAsync();
+    }
+
+    public async Task<List<Model.Task>> GetOverdueTasksAsync(Guid assigneeId)
+    {
+        var now = DateTime.UtcNow;
+        return await FullQuery()
+            .Where(t => t.AssignedTo == assigneeId
+                && t.DueDate.HasValue
+                && t.DueDate.Value < now
+                && t.Status != SmartFarmSEP490.Model.Enums.TaskStatus.Completed)
+            .OrderBy(t => t.DueDate)
+            .ToListAsync();
+    }
+
+    public async Task<Model.Task> AddAsync(Model.Task task)
     {
         await _context.Tasks.AddAsync(task);
         await _context.SaveChangesAsync();
         return task;
     }
 
-    public async System.Threading.Tasks.Task UpdateAsync(Model.Task task)
+    public async Task UpdateAsync(Model.Task task)
     {
         _context.Tasks.Update(task);
         await _context.SaveChangesAsync();
     }
 
-    public async System.Threading.Tasks.Task DeleteAsync(Guid id)
+    public async Task DeleteAsync(Guid id)
     {
         var task = await _context.Tasks.FindAsync(id);
         if (task != null)

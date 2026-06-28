@@ -1,14 +1,20 @@
 using SmartFarmSEP490.Model;
+using Task = System.Threading.Tasks.Task;
 
 namespace SmartFarmSEP490.Repository.Interfaces.Tasks;
 
 public interface ITaskRepository
 {
-    System.Threading.Tasks.Task<Model.Task?> GetByIdAsync(Guid id);
-    System.Threading.Tasks.Task<System.Collections.Generic.List<Model.Task>> GetByExperimentAsync(Guid experimentId);
-    System.Threading.Tasks.Task<System.Collections.Generic.List<Model.Task>> GetByAssigneeAsync(Guid assigneeId);
-    System.Threading.Tasks.Task<System.Collections.Generic.List<Model.Task>> GetAllAsync();
-    System.Threading.Tasks.Task<Model.Task> AddAsync(Model.Task task);
-    System.Threading.Tasks.Task UpdateAsync(Model.Task task);
-    System.Threading.Tasks.Task DeleteAsync(Guid id);
+    Task<Model.Task?> GetByIdAsync(Guid id);
+    Task<List<Model.Task>> GetByExperimentAsync(Guid experimentId);
+    Task<List<Model.Task>> GetByStageAsync(Guid stageId);
+    Task<List<Model.Task>> GetByBatchAsync(Guid batchId);
+    Task<List<Model.Task>> GetByAssigneeAsync(Guid assigneeId);
+    Task<List<Model.Task>> GetAllAsync();
+    Task<List<Model.Task>> GetTodayTasksAsync(Guid assigneeId);
+    Task<List<Model.Task>> GetUpcomingTasksAsync(Guid assigneeId, int days);
+    Task<List<Model.Task>> GetOverdueTasksAsync(Guid assigneeId);
+    Task<Model.Task> AddAsync(Model.Task task);
+    Task UpdateAsync(Model.Task task);
+    Task DeleteAsync(Guid id);
 }

@@ -29,6 +29,10 @@ public class TaskAssignmentRepository : ITaskAssignmentRepository
     public async Task<List<TaskAssignment>> GetByTaskIdAsync(Guid taskId)
     {
         return await _context.TaskAssignments
+            .Include(ta => ta.Task)
+            .Include(ta => ta.Assignee)
+                .ThenInclude(a => a.UserSkills)
+                    .ThenInclude(us => us.Skill)
             .Include(ta => ta.Assignee)
                 .ThenInclude(a => a.UserRoles)
                     .ThenInclude(ur => ur.Role)

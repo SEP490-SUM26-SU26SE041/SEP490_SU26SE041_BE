@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using SmartFarmSEP490.Model.Enums;
 
 namespace SmartFarmSEP490.Model;
 
@@ -12,6 +13,8 @@ public partial class CareSchedule
     public Guid? ExperimentStageId { get; set; }
 
     public Guid? BatchId { get; set; }
+
+    public TaskType TaskType { get; set; }
 
     public string Title { get; set; } = null!;
 

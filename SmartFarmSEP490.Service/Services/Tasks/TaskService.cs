@@ -1,6 +1,11 @@
+using SmartFarmSEP490.Model;
 using SmartFarmSEP490.Model.DTOs;
+using SmartFarmSEP490.Model.Enums;
 using SmartFarmSEP490.Repository.DbContexts;
 using SmartFarmSEP490.Repository.Interfaces.Auth;
+using SmartFarmSEP490.Repository.Interfaces.Batches;
+using SmartFarmSEP490.Repository.Interfaces.CareSchedules;
+using SmartFarmSEP490.Repository.Interfaces.ExperimentStages;
 using SmartFarmSEP490.Repository.Interfaces.Experiments;
 using SmartFarmSEP490.Repository.Interfaces.Tasks;
 using SmartFarmSEP490.Service.Interfaces.Tasks;
@@ -13,6 +18,9 @@ public class TaskService : ITaskService
     private readonly ITaskAssignmentRepository _assignmentRepository;
     private readonly ITaskSkillRequirementRepository _skillRequirementRepository;
     private readonly IExperimentRepository _experimentRepository;
+    private readonly IExperimentStageRepository _stageRepository;
+    private readonly ICareScheduleRepository _careScheduleRepository;
+    private readonly IBatchRepository _batchRepository;
     private readonly IUserRepository _userRepository;
     private readonly SmartFarmDbContext _context;
 
@@ -23,6 +31,9 @@ public class TaskService : ITaskService
         ITaskAssignmentRepository assignmentRepository,
         ITaskSkillRequirementRepository skillRequirementRepository,
         IExperimentRepository experimentRepository,
+        IExperimentStageRepository stageRepository,
+        ICareScheduleRepository careScheduleRepository,
+        IBatchRepository batchRepository,
         IUserRepository userRepository,
         SmartFarmDbContext context)
     {
@@ -30,6 +41,9 @@ public class TaskService : ITaskService
         _assignmentRepository = assignmentRepository;
         _skillRequirementRepository = skillRequirementRepository;
         _experimentRepository = experimentRepository;
+        _stageRepository = stageRepository;
+        _careScheduleRepository = careScheduleRepository;
+        _batchRepository = batchRepository;
         _userRepository = userRepository;
         _context = context;
     }
@@ -44,9 +58,9 @@ public class TaskService : ITaskService
     public async System.Threading.Tasks.Task<TaskResponseDto?> CreateAsync(CreateTaskDto dto, Guid createdById)
     {
         var experiment = await _experimentRepository.GetByIdAsync(dto.ExperimentId);
-        if (experiment == null) return null!;
+        if (experiment == null) return null;
 
-        var task = new SmartFarmSEP490.Model.Task
+        var task = new Model.Task
         {
             Id = Guid.NewGuid(),
             ExperimentId = dto.ExperimentId,
@@ -54,12 +68,12 @@ public class TaskService : ITaskService
             BatchId = dto.BatchId,
             CareScheduleId = dto.CareScheduleId,
             CreatedBy = createdById,
-            Type = Enum.TryParse<SmartFarmSEP490.Model.Enums.TaskType>(dto.TaskType, ignoreCase: true, out var tt) ? tt : SmartFarmSEP490.Model.Enums.TaskType.Other,
+            Type = Enum.TryParse<Model.Enums.TaskType>(dto.TaskType, ignoreCase: true, out var tt) ? tt : Model.Enums.TaskType.Other,
             Title = dto.Title,
             Description = dto.Description,
             RequiredSkillDescription = dto.RequiredSkillDescription,
             DueDate = dto.DueDate,
-            Status = SmartFarmSEP490.Model.Enums.TaskStatus.Pending,
+            Status = Model.Enums.TaskStatus.Pending,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -71,12 +85,28 @@ public class TaskService : ITaskService
     public async System.Threading.Tasks.Task<TaskResponseDto?> GetByIdAsync(Guid id)
     {
         var task = await _taskRepository.GetByIdAsync(id);
-        return task == null ? null! : await MapToResponseDto(task);
+        return task == null ? null : await MapToResponseDto(task);
     }
 
     public async System.Threading.Tasks.Task<List<TaskResponseDto>> GetByExperimentAsync(Guid experimentId)
     {
         var tasks = await _taskRepository.GetByExperimentAsync(experimentId);
+        var results = new List<TaskResponseDto>();
+        foreach (var t in tasks) results.Add(await MapToResponseDto(t));
+        return results;
+    }
+
+    public async System.Threading.Tasks.Task<List<TaskResponseDto>> GetByStageAsync(Guid stageId)
+    {
+        var tasks = await _taskRepository.GetByStageAsync(stageId);
+        var results = new List<TaskResponseDto>();
+        foreach (var t in tasks) results.Add(await MapToResponseDto(t));
+        return results;
+    }
+
+    public async System.Threading.Tasks.Task<List<TaskResponseDto>> GetByBatchAsync(Guid batchId)
+    {
+        var tasks = await _taskRepository.GetByBatchAsync(batchId);
         var results = new List<TaskResponseDto>();
         foreach (var t in tasks) results.Add(await MapToResponseDto(t));
         return results;
@@ -98,20 +128,44 @@ public class TaskService : ITaskService
         return results;
     }
 
+    public async System.Threading.Tasks.Task<List<TaskResponseDto>> GetTodayTasksAsync(Guid assigneeId)
+    {
+        var tasks = await _taskRepository.GetTodayTasksAsync(assigneeId);
+        var results = new List<TaskResponseDto>();
+        foreach (var t in tasks) results.Add(await MapToResponseDto(t));
+        return results;
+    }
+
+    public async System.Threading.Tasks.Task<List<TaskResponseDto>> GetUpcomingTasksAsync(Guid assigneeId, int days)
+    {
+        var tasks = await _taskRepository.GetUpcomingTasksAsync(assigneeId, days);
+        var results = new List<TaskResponseDto>();
+        foreach (var t in tasks) results.Add(await MapToResponseDto(t));
+        return results;
+    }
+
+    public async System.Threading.Tasks.Task<List<TaskResponseDto>> GetOverdueTasksAsync(Guid assigneeId)
+    {
+        var tasks = await _taskRepository.GetOverdueTasksAsync(assigneeId);
+        var results = new List<TaskResponseDto>();
+        foreach (var t in tasks) results.Add(await MapToResponseDto(t));
+        return results;
+    }
+
     public async System.Threading.Tasks.Task<TaskResponseDto?> UpdateAsync(Guid id, UpdateTaskDto dto, Guid userId)
     {
         var task = await _taskRepository.GetByIdAsync(id);
-        if (task == null) return null!;
+        if (task == null) return null;
 
         if (dto.ExperimentStageId != null) task.ExperimentStageId = dto.ExperimentStageId;
         if (dto.BatchId != null) task.BatchId = dto.BatchId;
         if (dto.CareScheduleId != null) task.CareScheduleId = dto.CareScheduleId;
-        if (!string.IsNullOrEmpty(dto.TaskType)) task.Type = Enum.TryParse<SmartFarmSEP490.Model.Enums.TaskType>(dto.TaskType, ignoreCase: true, out var tt) ? tt : task.Type;
+        if (!string.IsNullOrEmpty(dto.TaskType)) task.Type = Enum.TryParse<Model.Enums.TaskType>(dto.TaskType, ignoreCase: true, out var tt) ? tt : task.Type;
         if (!string.IsNullOrEmpty(dto.Title)) task.Title = dto.Title;
         if (dto.Description != null) task.Description = dto.Description;
         if (dto.RequiredSkillDescription != null) task.RequiredSkillDescription = dto.RequiredSkillDescription;
         if (dto.DueDate.HasValue) task.DueDate = dto.DueDate;
-        if (!string.IsNullOrEmpty(dto.Status)) task.Status = Enum.TryParse<SmartFarmSEP490.Model.Enums.TaskStatus>(dto.Status, ignoreCase: true, out var ts) ? ts : task.Status;
+        if (!string.IsNullOrEmpty(dto.Status)) task.Status = Enum.TryParse<Model.Enums.TaskStatus>(dto.Status, ignoreCase: true, out var ts) ? ts : task.Status;
         task.UpdatedAt = DateTime.UtcNow;
 
         await _taskRepository.UpdateAsync(task);
@@ -126,27 +180,231 @@ public class TaskService : ITaskService
         return true;
     }
 
+    public async System.Threading.Tasks.Task<GenerateByStageResultDto> GenerateByStageAsync(Guid stageId, Guid userId)
+    {
+        var stage = await _stageRepository.GetByIdAsync(stageId);
+        if (stage == null)
+        {
+            return new GenerateByStageResultDto { StageId = stageId, Tasks = new() };
+        }
+
+        var schedules = await _careScheduleRepository.GetByStageAsync(stageId);
+        var result = new GenerateByStageResultDto
+        {
+            StageId = stageId,
+            StageName = stage.StageName,
+            StageStartDate = stage.StartDate,
+            StageEndDate = stage.EndDate,
+            TotalSchedules = schedules.Count,
+            Tasks = new List<GeneratedTaskResultDto>()
+        };
+
+        foreach (var schedule in schedules)
+        {
+            // Determine which batches this schedule applies to
+            var targetBatchIds = new List<Guid>();
+            if (schedule.BatchId.HasValue)
+            {
+                targetBatchIds.Add(schedule.BatchId.Value);
+            }
+            else
+            {
+                // Schedule không gán batch cụ thể -> apply cho tất cả batches của experiment
+                var allBatches = await _batchRepository.GetByExperimentAsync(schedule.ExperimentId);
+                foreach (var b in allBatches) targetBatchIds.Add(b.Id);
+            }
+
+            // Determine time window: prefer Stage date range, fallback to schedule
+            var startDate = stage.StartDate ?? schedule.StartDate;
+            var endDate = stage.EndDate ?? schedule.EndDate ?? DateOnly.FromDateTime(DateTime.UtcNow);
+
+            if (startDate > endDate)
+            {
+                result.TasksSkipped++;
+                continue;
+            }
+
+            // Compute occurrences
+            var frequencyDays = schedule.FrequencyDays ?? 0;
+            List<DateOnly> dueDates;
+
+            if (frequencyDays > 0)
+            {
+                int totalDays = endDate.DayNumber - startDate.DayNumber;
+                int occurrences = Math.Max(1, (int)Math.Ceiling((double)(totalDays + 1) / frequencyDays));
+                dueDates = new List<DateOnly>();
+                for (int i = 0; i < occurrences; i++)
+                {
+                    var due = startDate.AddDays(i * frequencyDays);
+                    if (due > endDate) break;
+                    dueDates.Add(due);
+                }
+            }
+            else
+            {
+                dueDates = new List<DateOnly> { startDate };
+            }
+
+            foreach (var batchId in targetBatchIds)
+            {
+                foreach (var dueDate in dueDates)
+                {
+                    var dueDateTime = dueDate.ToDateTime(TimeOnly.MinValue);
+
+                    var existing = await _taskRepository.GetByBatchAsync(batchId);
+                    var alreadyExists = existing.Any(t =>
+                        t.CareScheduleId == schedule.Id &&
+                        t.Status != Model.Enums.TaskStatus.Completed &&
+                        t.DueDate.HasValue &&
+                        t.DueDate.Value.Date == dueDateTime.Date);
+
+                    if (alreadyExists)
+                    {
+                        result.TasksSkipped++;
+                        continue;
+                    }
+
+                    var task = new Model.Task
+                    {
+                        Id = Guid.NewGuid(),
+                        ExperimentId = schedule.ExperimentId,
+                        ExperimentStageId = schedule.ExperimentStageId,
+                        BatchId = batchId,
+                        CareScheduleId = schedule.Id,
+                        CreatedBy = userId,
+                        Type = schedule.TaskType,
+                        Title = schedule.Title,
+                        Description = schedule.Instruction,
+                        DueDate = dueDateTime,
+                        Status = Model.Enums.TaskStatus.Pending,
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow
+                    };
+
+                    await _taskRepository.AddAsync(task);
+                    result.TasksGenerated++;
+
+                    result.Tasks.Add(new GeneratedTaskResultDto
+                    {
+                        TaskId = task.Id,
+                        Title = task.Title,
+                        TaskType = task.Type.ToString(),
+                        Status = task.Status.ToString(),
+                        DueDate = task.DueDate,
+                        BatchId = batchId,
+                        ScheduleId = schedule.Id,
+                        IsNew = true,
+                        Message = $"Task scheduled for {dueDate:yyyy-MM-dd}"
+                    });
+                }
+            }
+        }
+
+        return result;
+    }
+
+    public async System.Threading.Tasks.Task<GenerateByExperimentResultDto> GenerateByExperimentAsync(Guid experimentId, Guid userId)
+    {
+        var stages = await _stageRepository.GetByExperimentAsync(experimentId);
+        var result = new GenerateByExperimentResultDto
+        {
+            ExperimentId = experimentId,
+            TotalStages = stages.Count,
+            Tasks = new List<GeneratedTaskResultDto>()
+        };
+
+        foreach (var stage in stages)
+        {
+            var schedules = await _careScheduleRepository.GetByStageAsync(stage.Id);
+            result.TotalSchedules += schedules.Count;
+
+            foreach (var schedule in schedules)
+            {
+                if (!schedule.BatchId.HasValue) continue;
+
+                var existingTasks = await _taskRepository.GetByBatchAsync(schedule.BatchId.Value);
+                var alreadyExists = existingTasks.Any(t =>
+                    t.CareScheduleId == schedule.Id &&
+                    t.Status != Model.Enums.TaskStatus.Completed);
+
+                if (alreadyExists)
+                {
+                    result.TasksSkipped++;
+                    continue;
+                }
+
+                var task = new Model.Task
+                {
+                    Id = Guid.NewGuid(),
+                    ExperimentId = schedule.ExperimentId,
+                    ExperimentStageId = schedule.ExperimentStageId,
+                    BatchId = schedule.BatchId,
+                    CareScheduleId = schedule.Id,
+                    CreatedBy = userId,
+                    Type = schedule.TaskType,
+                    Title = schedule.Title,
+                    Description = schedule.Instruction,
+                    DueDate = schedule.EndDate.HasValue
+                        ? schedule.EndDate.Value.ToDateTime(TimeOnly.MinValue)
+                        : null,
+                    Status = Model.Enums.TaskStatus.Pending,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
+
+                await _taskRepository.AddAsync(task);
+                result.TasksGenerated++;
+
+                result.Tasks.Add(new GeneratedTaskResultDto
+                {
+                    TaskId = task.Id,
+                    Title = task.Title,
+                    TaskType = task.Type.ToString(),
+                    Status = task.Status.ToString(),
+                    DueDate = task.DueDate,
+                    ScheduleId = schedule.Id,
+                    IsNew = true,
+                    Message = $"Generated from Stage '{stage.StageName}'"
+                });
+            }
+        }
+
+        return result;
+    }
+
+    public async System.Threading.Tasks.Task<TaskResponseDto?> UpdateTaskStatusAsync(Guid id, string status, Guid userId)
+    {
+        var task = await _taskRepository.GetByIdAsync(id);
+        if (task == null) return null;
+
+        task.Status = Enum.TryParse<Model.Enums.TaskStatus>(status, ignoreCase: true, out var ts) ? ts : task.Status;
+        task.UpdatedAt = DateTime.UtcNow;
+        await _taskRepository.UpdateAsync(task);
+
+        return await MapToResponseDto(task);
+    }
+
     public async System.Threading.Tasks.Task<TaskResponseDto?> AssignTaskAsync(AssignTaskDto dto, Guid assignedById)
     {
         var task = await _taskRepository.GetByIdAsync(dto.TaskId);
-        if (task == null) return null!;
+        if (task == null) return null;
 
         var assignee = await _userRepository.GetUserByIdAsync(dto.AssigneeId);
-        if (assignee == null) return null!;
+        if (assignee == null) return null;
 
         var isAllowedRole = assignee.UserRoles.Any(ur => AssignableRoles.Contains(ur.Role.RoleName));
-        if (!isAllowedRole) return null!;
+        if (!isAllowedRole) return null;
 
         var existingActive = await _assignmentRepository.GetActiveByTaskAndAssigneeAsync(dto.TaskId, dto.AssigneeId);
-        if (existingActive != null) return null!;
+        if (existingActive != null) return null;
 
-        var assignment = new SmartFarmSEP490.Model.TaskAssignment
+        var assignment = new Model.TaskAssignment
         {
             Id = Guid.NewGuid(),
             TaskId = dto.TaskId,
             AssigneeId = dto.AssigneeId,
             AssignedBy = assignedById,
-            Status = SmartFarmSEP490.Model.Enums.TaskAssignmentStatus.Assigned,
+            Status = Model.Enums.TaskAssignmentStatus.Assigned,
             Reason = dto.Reason,
             AssignedAt = DateTime.UtcNow
         };
@@ -163,29 +421,29 @@ public class TaskService : ITaskService
     public async System.Threading.Tasks.Task<TaskResponseDto?> ReassignTaskAsync(ReassignTaskDto dto, Guid reassignedById)
     {
         var task = await _taskRepository.GetByIdAsync(dto.TaskId);
-        if (task == null) return null!;
+        if (task == null) return null;
 
         var newAssignee = await _userRepository.GetUserByIdAsync(dto.NewAssigneeId);
-        if (newAssignee == null) return null!;
+        if (newAssignee == null) return null;
 
         var isAllowedRole = newAssignee.UserRoles.Any(ur => AssignableRoles.Contains(ur.Role.RoleName));
-        if (!isAllowedRole) return null!;
+        if (!isAllowedRole) return null;
 
         var existingAssignments = await _assignmentRepository.GetByTaskIdAsync(dto.TaskId);
         foreach (var existing in existingAssignments.Where(a => a.EndedAt == null))
         {
-            existing.Status = SmartFarmSEP490.Model.Enums.TaskAssignmentStatus.Reassigned;
+            existing.Status = Model.Enums.TaskAssignmentStatus.Reassigned;
             existing.EndedAt = DateTime.UtcNow;
             await _assignmentRepository.UpdateAsync(existing);
         }
 
-        var newAssignment = new SmartFarmSEP490.Model.TaskAssignment
+        var newAssignment = new Model.TaskAssignment
         {
             Id = Guid.NewGuid(),
             TaskId = dto.TaskId,
             AssigneeId = dto.NewAssigneeId,
             AssignedBy = reassignedById,
-            Status = SmartFarmSEP490.Model.Enums.TaskAssignmentStatus.Assigned,
+            Status = Model.Enums.TaskAssignmentStatus.Assigned,
             Reason = dto.Reason,
             AssignedAt = DateTime.UtcNow
         };
@@ -199,24 +457,12 @@ public class TaskService : ITaskService
         return await MapToResponseDto(task);
     }
 
-    public async System.Threading.Tasks.Task<TaskResponseDto?> UpdateTaskStatusAsync(Guid id, string status, Guid userId)
-    {
-        var task = await _taskRepository.GetByIdAsync(id);
-        if (task == null) return null!;
-
-        task.Status = Enum.TryParse<SmartFarmSEP490.Model.Enums.TaskStatus>(status, ignoreCase: true, out var ts) ? ts : task.Status;
-        task.UpdatedAt = DateTime.UtcNow;
-        await _taskRepository.UpdateAsync(task);
-
-        return await MapToResponseDto(task);
-    }
-
     public async System.Threading.Tasks.Task<TaskAssignmentResponseDto?> UpdateAssignmentStatusAsync(UpdateTaskAssignmentStatusDto dto)
     {
         var assignment = await _assignmentRepository.GetByIdAsync(dto.AssignmentId);
-        if (assignment == null) return null!;
+        if (assignment == null) return null;
 
-        assignment.Status = Enum.TryParse<SmartFarmSEP490.Model.Enums.TaskAssignmentStatus>(dto.Status, ignoreCase: true, out var as_) ? as_ : assignment.Status;
+        assignment.Status = Enum.TryParse<Model.Enums.TaskAssignmentStatus>(dto.Status, ignoreCase: true, out var as_) ? as_ : assignment.Status;
         if (dto.Status == "Completed" || dto.Status == "Cancelled" || dto.Status == "Resigned")
         {
             assignment.EndedAt = DateTime.UtcNow;
@@ -228,7 +474,7 @@ public class TaskService : ITaskService
             var task = await _taskRepository.GetByIdAsync(assignment.TaskId);
             if (task != null)
             {
-                task.Status = SmartFarmSEP490.Model.Enums.TaskStatus.Completed;
+                task.Status = Model.Enums.TaskStatus.Completed;
                 task.UpdatedAt = DateTime.UtcNow;
                 await _taskRepository.UpdateAsync(task);
             }
@@ -312,17 +558,9 @@ public class TaskService : ITaskService
         return results.OrderByDescending(r => r.MatchScore).ToList();
     }
 
-    private async System.Threading.Tasks.Task<TaskResponseDto> MapToResponseDto(SmartFarmSEP490.Model.Task task)
+    private async System.Threading.Tasks.Task<TaskResponseDto> MapToResponseDto(Model.Task task)
     {
         var experiment = await _experimentRepository.GetByIdAsync(task.ExperimentId);
-        string? experimentTitle = experiment?.Title;
-        string? experimentCode = experiment?.ExperimentCode;
-
-        string? experimentStageName = task.ExperimentStageId.HasValue ? task.ExperimentStage?.StageName : null;
-        string? batchCode = task.BatchId.HasValue ? task.Batch?.BatchCode : null;
-        string? careScheduleTitle = task.CareScheduleId.HasValue ? task.CareSchedule?.Title : null;
-        string? createdByName = task.CreatedByNavigation?.FullName;
-        string? assignedToName = task.AssignedToNavigation?.FullName;
 
         var skillReqDtos = task.TaskSkillRequirements
             .Select(tsr => new TaskSkillRequirementResponseDto
@@ -348,24 +586,24 @@ public class TaskService : ITaskService
             CreatedAt = task.CreatedAt,
             UpdatedAt = task.UpdatedAt,
             ExperimentId = task.ExperimentId,
-            ExperimentTitle = experimentTitle,
-            ExperimentCode = experimentCode,
+            ExperimentTitle = experiment?.Title,
+            ExperimentCode = experiment?.ExperimentCode,
             ExperimentStageId = task.ExperimentStageId,
-            ExperimentStageName = experimentStageName,
+            ExperimentStageName = task.ExperimentStage?.StageName,
             BatchId = task.BatchId,
-            BatchCode = batchCode,
+            BatchCode = task.Batch?.BatchCode,
             CareScheduleId = task.CareScheduleId,
-            CareScheduleTitle = careScheduleTitle,
+            CareScheduleTitle = task.CareSchedule?.Title,
             CreatedBy = task.CreatedBy,
-            CreatedByName = createdByName,
+            CreatedByName = task.CreatedByNavigation?.FullName,
             AssignedTo = task.AssignedTo,
-            AssignedToName = assignedToName,
+            AssignedToName = task.AssignedToNavigation?.FullName,
             SkillRequirements = skillReqDtos,
             Assignments = assignmentDtos
         };
     }
 
-    private static TaskAssignmentResponseDto MapAssignmentToResponseDto(SmartFarmSEP490.Model.TaskAssignment assignment)
+    private static TaskAssignmentResponseDto MapAssignmentToResponseDto(Model.TaskAssignment assignment)
     {
         var roleName = assignment.Assignee?.UserRoles?.FirstOrDefault()?.Role?.RoleName ?? "";
 
