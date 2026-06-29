@@ -64,7 +64,7 @@ public class ExperimentService : IExperimentService
                 Hypothesis = dto.Hypothesis,
                 StartDate = dto.StartDate,
                 EndDate = dto.EndDate,
-                Status = ExperimentStatus.Draft
+                Status = ExperimentStatus.Active
             };
 
             if (dto.ProcedureTemplateId.HasValue)
@@ -117,7 +117,7 @@ public class ExperimentService : IExperimentService
                 ProcedureTemplateId = request.ProcedureTemplateId,
                 Title = request.Title,
                 Objective = request.Objective,
-                Status = ExperimentStatus.Draft
+                Status = ExperimentStatus.Active
             };
 
             if (request.ProcedureTemplateId.HasValue)
