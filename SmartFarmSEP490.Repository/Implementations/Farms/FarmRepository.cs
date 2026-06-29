@@ -15,18 +15,25 @@ public class FarmRepository : IFarmRepository
     public async Task<M.Farm?> GetByIdAsync(Guid id) => await _context.Farms.FindAsync(id);
 
     public async Task<M.Farm?> GetByIdWithDetailsAsync(Guid id) =>
-        await _context.Farms.Include(f => f.Manager)
-            .Include(f => f.Areas).ThenInclude(a => a.Beds)
+        await _context.Farms
+            .Include(f => f.Manager)
+            .Include(f => f.Areas).ThenInclude(a => a.Beds).ThenInclude(b => b.ExperimentBedAssignments)
             .FirstOrDefaultAsync(f => f.Id == id);
 
     public async Task<List<M.Farm>> GetAllAsync() =>
-        await _context.Farms.Include(f => f.Manager).OrderBy(f => f.FarmName).ToListAsync();
+        await _context.Farms
+            .Include(f => f.Manager)
+            .Include(f => f.Areas).ThenInclude(a => a.Beds).ThenInclude(b => b.ExperimentBedAssignments)
+            .OrderBy(f => f.FarmName)
+            .ToListAsync();
 
     public async Task<M.Farm?> GetByCodeAsync(string code) =>
         await _context.Farms.FirstOrDefaultAsync(f => f.FarmCode == code);
 
     public async Task<List<M.Farm>> GetByManagerAsync(Guid managerId) =>
-        await _context.Farms.Include(f => f.Manager)
+        await _context.Farms
+            .Include(f => f.Manager)
+            .Include(f => f.Areas).ThenInclude(a => a.Beds).ThenInclude(b => b.ExperimentBedAssignments)
             .Where(f => f.ManagerId == managerId)
             .OrderBy(f => f.FarmName)
             .ToListAsync();

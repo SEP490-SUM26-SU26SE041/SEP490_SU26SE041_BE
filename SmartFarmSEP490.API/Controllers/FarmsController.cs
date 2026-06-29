@@ -41,15 +41,16 @@ public class FarmsController : ControllerBase
     }
 
     [HttpGet("{id:guid}")]
+    [AllowAnonymous]
     public async Task<IActionResult> GetFarmById(Guid id)
     {
         var result = await _farmService.GetByIdAsync(id);
         if (result == null) return NotFound();
-        if (!await CanAccessFarmAsync(id)) return Forbid();
         return Ok(result);
     }
 
     [HttpGet]
+    [AllowAnonymous]
     public async Task<IActionResult> GetAllFarms() => Ok(await _farmService.GetAllAsync());
 
     [HttpGet("my-farms")]
@@ -105,9 +106,9 @@ public class FarmsController : ControllerBase
     }
 
     [HttpGet("farms/{farmId:guid}/areas")]
+    [AllowAnonymous]
     public async Task<IActionResult> GetAreasByFarm(Guid farmId)
     {
-        if (!await CanAccessFarmAsync(farmId)) return Forbid();
         return Ok(await _areaService.GetByFarmAsync(farmId));
     }
 
@@ -207,27 +208,20 @@ public class FarmsController : ControllerBase
     }
 
     [HttpGet("bed-assignments/{id:guid}")]
+    [AllowAnonymous]
     public async Task<IActionResult> GetBedAssignmentById(Guid id)
     {
         var assignments = await _assignmentService.GetByExperimentAsync(id);
         var first = assignments.FirstOrDefault(a => a.Id == id);
-        if (first == null) return NotFound();
-        var bed = await _bedService.GetByIdAsync(first.BedId);
-        if (bed == null || !await CanAccessFarmAsync(bed.FarmId)) return Forbid();
-        return Ok(first);
+        return first == null ? NotFound() : Ok(first);
     }
 
     [HttpGet("experiments/{experimentId:guid}/bed-assignments")]
+    [AllowAnonymous]
     public async Task<IActionResult> GetBedAssignmentsByExperiment(Guid experimentId)
     {
         var assignments = await _assignmentService.GetByExperimentAsync(experimentId);
-        var filtered = new List<ExperimentBedAssignmentResponseDto>();
-        foreach (var a in assignments)
-        {
-            var bed = await _bedService.GetByIdAsync(a.BedId);
-            if (bed != null && await CanAccessFarmAsync(bed.FarmId)) filtered.Add(a);
-        }
-        return Ok(filtered);
+        return Ok(assignments);
     }
 
     [HttpPut("bed-assignments/{id:guid}")]
