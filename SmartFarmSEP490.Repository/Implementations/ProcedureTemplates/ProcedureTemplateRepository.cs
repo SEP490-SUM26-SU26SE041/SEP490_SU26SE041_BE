@@ -20,18 +20,12 @@ public class ProcedureTemplateRepository : IProcedureTemplateRepository
             .FirstOrDefaultAsync(p => p.Id == id);
 
     public async Task<List<M.ProcedureTemplate>> GetAllAsync() =>
-        await _context.ProcedureTemplates
-            .Include(p => p.CropVariety)
-            .Include(p => p.ProcedureTemplateSteps.OrderBy(s => s.StepOrder))
-            .OrderBy(p => p.TemplateName)
-            .ToListAsync();
+        await _context.ProcedureTemplates.Include(p => p.CropVariety).OrderBy(p => p.TemplateName).ToListAsync();
 
     public async Task<List<M.ProcedureTemplate>> GetByCropVarietyAsync(Guid cropVarietyId) =>
         await _context.ProcedureTemplates
-            .Include(p => p.CropVariety)
-            .Include(p => p.ProcedureTemplateSteps.OrderBy(s => s.StepOrder))
             .Where(p => p.CropVarietyId == cropVarietyId)
-            .ToListAsync();
+            .Include(p => p.ProcedureTemplateSteps.OrderBy(s => s.StepOrder)).ToListAsync();
 
     public async Task<M.ProcedureTemplate> CreateAsync(M.ProcedureTemplate entity)
     {

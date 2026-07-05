@@ -14,11 +14,8 @@ public class AreaRepository : IAreaRepository
     public async Task<M.Area?> GetByIdAsync(Guid id) => await _context.Areas.FindAsync(id);
 
     public async Task<List<M.Area>> GetByFarmAsync(Guid farmId) =>
-        await _context.Areas
-            .Include(a => a.Beds).ThenInclude(b => b.ExperimentBedAssignments)
-            .Where(a => a.FarmId == farmId && a.DeletedAt == null)
-            .OrderBy(a => a.AreaName)
-            .ToListAsync();
+        await _context.Areas.Include(a => a.Beds)
+            .Where(a => a.FarmId == farmId && a.DeletedAt == null).OrderBy(a => a.AreaName).ToListAsync();
 
     public async Task<M.Area> CreateAsync(M.Area entity)
     {

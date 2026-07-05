@@ -20,8 +20,7 @@ public class ExperimentBedAssignmentRepository : IExperimentBedAssignmentReposit
 
     public async Task<List<M.ExperimentBedAssignment>> GetByExperimentAsync(Guid experimentId) =>
         await _context.ExperimentBedAssignments
-            .Include(e => e.Experiment)
-            .Include(e => e.Bed).ThenInclude(b => b.Area).ThenInclude(a => a.Farm)
+            .Include(e => e.Bed).ThenInclude(b => b.Area)
             .Where(e => e.ExperimentId == experimentId).ToListAsync();
 
     public async Task<M.ExperimentBedAssignment?> GetActiveByBedAsync(Guid bedId, Guid? currentRequestId = null)
