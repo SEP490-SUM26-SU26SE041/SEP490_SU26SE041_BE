@@ -103,7 +103,7 @@ public partial class SmartFarmDbContext : DbContext
             .HasPostgresEnum("DesignType", new[] { "CompletelyRandomized", "RandomizedCompleteBlock", "Factorial", "Observational", "Other" })
             .HasPostgresEnum("DocumentStatus", new[] { "Draft", "Indexed", "Archived" })
             .HasPostgresEnum("ExperimentStageType", new[] { "Nursery", "Care", "Growth", "Harvest", "Evaluation", "Other" })
-            .HasPostgresEnum("ExperimentStatus", new[] { "Active", "Completed" })
+            .HasPostgresEnum("ExperimentStatus", new[] { "Draft", "Approved", "Active", "Completed", "Cancelled" })
             .HasPostgresEnum("GroupType", new[] { "Control", "Treatment" })
             .HasPostgresEnum("LocationStatus", new[] { "Available", "InUse", "Maintenance", "Unavailable" })
             .HasPostgresEnum("RequestStatus", new[] { "Pending", "Approved", "Rejected", "Cancelled" })
@@ -382,7 +382,7 @@ public partial class SmartFarmDbContext : DbContext
 
             entity.Property(e => e.Status)
                 .HasColumnType("ExperimentStatus")
-                .HasDefaultValueSql("'Active'::\"ExperimentStatus\"");
+                .HasDefaultValueSql("'Draft'::\"ExperimentStatus\"");
         });
 
         modelBuilder.Entity<ExperimentBedAssignment>(entity =>
