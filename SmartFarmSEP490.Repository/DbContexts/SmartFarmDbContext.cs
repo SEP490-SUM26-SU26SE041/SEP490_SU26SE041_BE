@@ -103,7 +103,7 @@ public partial class SmartFarmDbContext : DbContext
             .HasPostgresEnum("DesignType", new[] { "CompletelyRandomized", "RandomizedCompleteBlock", "Factorial", "Observational", "Other" })
             .HasPostgresEnum("DocumentStatus", new[] { "Draft", "Indexed", "Archived" })
             .HasPostgresEnum("ExperimentStageType", new[] { "Nursery", "Care", "Growth", "Harvest", "Evaluation", "Other" })
-            .HasPostgresEnum("ExperimentStatus", new[] { "Draft", "Approved", "Active", "Completed", "Cancelled" })
+            .HasPostgresEnum("ExperimentStatus", new[] { "Active", "Completed" })
             .HasPostgresEnum("GroupType", new[] { "Control", "Treatment" })
             .HasPostgresEnum("LocationStatus", new[] { "Available", "InUse", "Maintenance", "Unavailable" })
             .HasPostgresEnum("RequestStatus", new[] { "Pending", "Approved", "Rejected", "Cancelled" })
@@ -382,7 +382,7 @@ public partial class SmartFarmDbContext : DbContext
 
             entity.Property(e => e.Status)
                 .HasColumnType("ExperimentStatus")
-                .HasDefaultValueSql("'Draft'::\"ExperimentStatus\"");
+                .HasDefaultValueSql("'Active'::\"ExperimentStatus\"");
         });
 
         modelBuilder.Entity<ExperimentBedAssignment>(entity =>
@@ -891,7 +891,7 @@ public partial class SmartFarmDbContext : DbContext
                 .HasDefaultValueSql("now()")
                 .HasColumnType("timestamp without time zone");
             entity.Property(e => e.DueDate).HasColumnType("timestamp without time zone");
-            entity.Property(e => e.Status).HasColumnName("Status").HasColumnType("TaskStatus");
+            entity.Property(e => e.Status).HasColumnName("Status").HasConversion<string>().HasMaxLength(20);
             entity.Property(e => e.Title).HasMaxLength(150);
             entity.Property(e => e.Type).HasColumnName("TaskType").HasColumnType("TaskType");
             entity.Property(e => e.UpdatedAt)

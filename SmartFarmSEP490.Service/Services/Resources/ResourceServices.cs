@@ -121,7 +121,14 @@ public class FarmService : SvcInterfaces.IFarmService
                         SoilDescription = b.SoilDescription,
                         Length = b.Length,
                         Width = b.Width,
-                        AllocationStatus = null,
+                        AllocationStatus = (b.ExperimentBedAssignments != null
+                            && b.ExperimentBedAssignments.Any(x => x.Status != Model.Enums.AllocationStatus.Released))
+                            ? b.ExperimentBedAssignments
+                                .Where(x => x.Status != Model.Enums.AllocationStatus.Released)
+                                .OrderByDescending(x => x.AssignedFrom)
+                                .First()
+                                .Status.ToString()
+                            : "Available",
                         AreaId = b.AreaId,
                         AreaName = a.AreaName,
                         FarmId = a.FarmId,
@@ -213,12 +220,35 @@ public class AreaService : SvcInterfaces.IAreaService
                 SoilDescription = b.SoilDescription,
                 Length = b.Length,
                 Width = b.Width,
-                AllocationStatus = null,
+                AllocationStatus = (b.ExperimentBedAssignments != null
+                    && b.ExperimentBedAssignments.Any(x => x.Status != Model.Enums.AllocationStatus.Released))
+                    ? b.ExperimentBedAssignments
+                        .Where(x => x.Status != Model.Enums.AllocationStatus.Released)
+                        .OrderByDescending(x => x.AssignedFrom)
+                        .First().Status.ToString()
+                    : "Available",
                 AreaId = b.AreaId,
                 AreaName = a.AreaName,
                 FarmId = a.FarmId,
                 CreatedAt = b.CreatedAt,
-                UpdatedAt = b.UpdatedAt
+                UpdatedAt = b.UpdatedAt,
+                Assignments = (b.ExperimentBedAssignments ?? new List<M.ExperimentBedAssignment>())
+                    .OrderByDescending(x => x.AssignedFrom)
+                    .Select(x => new ExperimentBedAssignmentResponseDto
+                    {
+                        Id = x.Id,
+                        RequestId = x.RequestId,
+                        ExperimentId = x.ExperimentId,
+                        ExperimentTitle = x.Experiment?.Title,
+                        BedId = x.BedId,
+                        BedCode = b.BedCode,
+                        AllocationStatus = x.Status.ToString(),
+                        AreaName = a.AreaName,
+                        FarmName = a.Farm?.FarmName,
+                        AssignedFrom = x.AssignedFrom,
+                        AssignedTo = x.AssignedTo,
+                        Purpose = x.Purpose
+                    }).ToList()
             }).ToList()
     };
 }

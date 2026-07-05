@@ -34,7 +34,7 @@ public partial class Experiment
 
     public DateTime UpdatedAt { get; set; }
 
-    public ExperimentStatus Status { get; set; } = ExperimentStatus.Draft;
+    public ExperimentStatus Status { get; set; } = ExperimentStatus.Active;
 
     public DateTime? DeletedAt { get; set; }
 

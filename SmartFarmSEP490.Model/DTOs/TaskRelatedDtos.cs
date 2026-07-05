@@ -33,9 +33,6 @@ public class GenerateByStageResultDto
     public int TotalSchedules { get; set; }
     public int TasksGenerated { get; set; }
     public int TasksSkipped { get; set; }
-    public int ExistingTasksCount { get; set; }
-    public bool HasError { get; set; }
-    public string? Message { get; set; }
     public List<GeneratedTaskResultDto> Tasks { get; set; } = new();
 }
 
@@ -46,10 +43,6 @@ public class GenerateByExperimentResultDto
     public int TotalSchedules { get; set; }
     public int TasksGenerated { get; set; }
     public int TasksSkipped { get; set; }
-    public int StagesSkipped { get; set; }
-    public bool HasError { get; set; }
-    public string? Message { get; set; }
-    public List<GenerateByStageResultDto> StageResults { get; set; } = new();
     public List<GeneratedTaskResultDto> Tasks { get; set; } = new();
 }
 

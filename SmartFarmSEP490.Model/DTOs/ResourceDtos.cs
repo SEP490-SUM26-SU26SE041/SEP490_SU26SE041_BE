@@ -101,6 +101,7 @@ public class BedResponseDto
     public Guid FarmId { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
+    public List<ExperimentBedAssignmentResponseDto> Assignments { get; set; } = new();
 }
 
 // ============ Bed Reservation DTOs ============
