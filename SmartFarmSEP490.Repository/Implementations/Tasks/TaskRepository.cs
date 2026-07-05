@@ -93,11 +93,12 @@ public class TaskRepository : ITaskRepository
     public async Task<List<Model.Task>> GetOverdueTasksAsync(Guid assigneeId)
     {
         var now = DateTime.UtcNow;
+        var completedStatus = SmartFarmSEP490.Model.Enums.TaskStatus.Completed;
         return await FullQuery()
             .Where(t => t.AssignedTo == assigneeId
                 && t.DueDate.HasValue
                 && t.DueDate.Value < now
-                && t.Status != SmartFarmSEP490.Model.Enums.TaskStatus.Completed)
+                && t.Status != completedStatus)
             .OrderBy(t => t.DueDate)
             .ToListAsync();
     }

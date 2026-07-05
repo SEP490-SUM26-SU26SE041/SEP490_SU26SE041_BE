@@ -74,22 +74,23 @@ System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler.DefaultMapInboundClaims 
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")!;
 var dataSourceBuilder = new NpgsqlDataSourceBuilder(connectionString);
-dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.AIReviewStatus>("AIReviewStatus", new NpgsqlNullNameTranslator());
-dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.AllocationStatus>("AllocationStatus", new NpgsqlNullNameTranslator());
-dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.AlertSeverity>("AlertSeverity", new NpgsqlNullNameTranslator());
-dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.BatchStatus>("BatchStatus", new NpgsqlNullNameTranslator());
-dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.DesignType>("DesignType", new NpgsqlNullNameTranslator());
-dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.DocumentStatus>("DocumentStatus", new NpgsqlNullNameTranslator());
-dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.ExperimentStageType>("ExperimentStageType", new NpgsqlNullNameTranslator());
-dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.ExperimentStatus>("ExperimentStatus", new NpgsqlNullNameTranslator());
-dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.GroupType>("GroupType", new NpgsqlNullNameTranslator());
-dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.LocationStatus>("LocationStatus", new NpgsqlNullNameTranslator());
-dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.RequestStatus>("RequestStatus", new NpgsqlNullNameTranslator());
-dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.ReviewResult>("ReviewResult", new NpgsqlNullNameTranslator());
-dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.SensorType>("SensorType", new NpgsqlNullNameTranslator());
-dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.TaskAssignmentStatus>("TaskAssignmentStatus", new NpgsqlNullNameTranslator());
-dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.TaskStatus>("TaskStatus", new NpgsqlNullNameTranslator());
-dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.TaskType>("TaskType", new NpgsqlNullNameTranslator());
+var enumNameTranslator = new NpgsqlNullNameTranslator();
+dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.AIReviewStatus>("AIReviewStatus", enumNameTranslator);
+dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.AllocationStatus>("AllocationStatus", enumNameTranslator);
+dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.AlertSeverity>("AlertSeverity", enumNameTranslator);
+dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.BatchStatus>("BatchStatus", enumNameTranslator);
+dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.DesignType>("DesignType", enumNameTranslator);
+dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.DocumentStatus>("DocumentStatus", enumNameTranslator);
+dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.ExperimentStageType>("ExperimentStageType", enumNameTranslator);
+dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.ExperimentStatus>("ExperimentStatus", enumNameTranslator);
+dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.GroupType>("GroupType", enumNameTranslator);
+dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.LocationStatus>("LocationStatus", enumNameTranslator);
+dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.RequestStatus>("RequestStatus", enumNameTranslator);
+dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.ReviewResult>("ReviewResult", enumNameTranslator);
+dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.SensorType>("SensorType", enumNameTranslator);
+dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.TaskAssignmentStatus>("TaskAssignmentStatus", enumNameTranslator);
+dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.TaskStatus>("TaskStatus", enumNameTranslator);
+dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.TaskType>("TaskType", enumNameTranslator);
 var dataSource = dataSourceBuilder.Build();
 
 builder.Services.AddDbContext<SmartFarmDbContext>(options =>

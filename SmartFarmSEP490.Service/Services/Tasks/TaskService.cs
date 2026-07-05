@@ -185,10 +185,55 @@ public class TaskService : ITaskService
         var stage = await _stageRepository.GetByIdAsync(stageId);
         if (stage == null)
         {
-            return new GenerateByStageResultDto { StageId = stageId, Tasks = new() };
+            return new GenerateByStageResultDto
+            {
+                StageId = stageId,
+                Tasks = new(),
+                HasError = true,
+                Message = $"Stage with id '{stageId}' was not found."
+            };
         }
 
         var schedules = await _careScheduleRepository.GetByStageAsync(stageId);
+
+        // CHECK: Stage phải có ít nhất 1 CareSchedule trước khi sinh task
+        if (schedules == null || schedules.Count == 0)
+        {
+            return new GenerateByStageResultDto
+            {
+                StageId = stageId,
+                StageName = stage.StageName,
+                StageStartDate = stage.StartDate,
+                StageEndDate = stage.EndDate,
+                TotalSchedules = 0,
+                TasksGenerated = 0,
+                TasksSkipped = 0,
+                HasError = true,
+                Message = $"Stage '{stage.StageName}' chưa có CareSchedule nào. Vui lòng tạo CareSchedule cho giai đoạn này trước khi sinh task.",
+                Tasks = new()
+            };
+        }
+
+        // CHECK: Stage đã được generate task trước đó chưa?
+        var existingStageTasks = await _taskRepository.GetByStageAsync(stageId);
+        if (existingStageTasks != null && existingStageTasks.Count > 0)
+        {
+            return new GenerateByStageResultDto
+            {
+                StageId = stageId,
+                StageName = stage.StageName,
+                StageStartDate = stage.StartDate,
+                StageEndDate = stage.EndDate,
+                TotalSchedules = schedules.Count,
+                TasksGenerated = 0,
+                TasksSkipped = existingStageTasks.Count,
+                ExistingTasksCount = existingStageTasks.Count,
+                HasError = true,
+                Message = $"Stage '{stage.StageName}' đã được tạo task rồi ({existingStageTasks.Count} task hiện có). Vui lòng xóa các task đã phát sinh của stage này trước khi sinh lại.",
+                Tasks = new()
+            };
+        }
+
         var result = new GenerateByStageResultDto
         {
             StageId = stageId,
@@ -310,66 +355,39 @@ public class TaskService : ITaskService
         {
             ExperimentId = experimentId,
             TotalStages = stages.Count,
-            Tasks = new List<GeneratedTaskResultDto>()
+            StageResults = new List<GenerateByStageResultDto>()
         };
 
-        foreach (var stage in stages)
+        foreach (var stage in stages.OrderBy(s => s.StageOrder))
         {
-            var schedules = await _careScheduleRepository.GetByStageAsync(stage.Id);
-            result.TotalSchedules += schedules.Count;
+            // Delegate xử lý từng stage cho GenerateByStageAsync để đảm bảo logic đồng nhất:
+            //   - Check CareSchedule tồn tại
+            //   - Check stage đã generate task chưa
+            //   - Tính FrequencyDays, due dates
+            //   - Xử lý BatchId == null (apply cho tất cả batches)
+            //   - Dedupe theo CareScheduleId + DueDate
+            var stageResult = await GenerateByStageAsync(stage.Id, userId);
+            result.StageResults.Add(stageResult);
+            result.TotalSchedules += stageResult.TotalSchedules;
 
-            foreach (var schedule in schedules)
+            if (stageResult.HasError)
             {
-                if (!schedule.BatchId.HasValue) continue;
-
-                var existingTasks = await _taskRepository.GetByBatchAsync(schedule.BatchId.Value);
-                var alreadyExists = existingTasks.Any(t =>
-                    t.CareScheduleId == schedule.Id &&
-                    t.Status != Model.Enums.TaskStatus.Completed);
-
-                if (alreadyExists)
+                // Stage bị skip vì lý do nghiệp vụ (chưa có CareSchedule / đã có task)
+                result.StagesSkipped++;
+                continue;
+            }
+            result.TasksGenerated += stageResult.TasksGenerated;
+            result.TasksSkipped += stageResult.TasksSkipped;
+            result.Tasks.AddRange(stageResult.Tasks);
+        }
+                // Thông báo tổng hợp nếu toàn bộ experiment đều bị skip
+                if (result.TasksGenerated == 0 && result.StagesSkipped == result.TotalStages && result.TotalStages > 0)
                 {
-                    result.TasksSkipped++;
-                    continue;
+                    result.HasError = true;
+                    result.Message = $"Không thể sinh task cho experiment. Tất cả {result.TotalStages} stage đều chưa có CareSchedule hoặc đã được generate task trước đó.";
                 }
 
-                var task = new Model.Task
-                {
-                    Id = Guid.NewGuid(),
-                    ExperimentId = schedule.ExperimentId,
-                    ExperimentStageId = schedule.ExperimentStageId,
-                    BatchId = schedule.BatchId,
-                    CareScheduleId = schedule.Id,
-                    CreatedBy = userId,
-                    Type = schedule.TaskType,
-                    Title = schedule.Title,
-                    Description = schedule.Instruction,
-                    DueDate = schedule.EndDate.HasValue
-                        ? schedule.EndDate.Value.ToDateTime(TimeOnly.MinValue)
-                        : null,
-                    Status = Model.Enums.TaskStatus.Pending,
-                    CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow
-                };
-
-                await _taskRepository.AddAsync(task);
-                result.TasksGenerated++;
-
-                result.Tasks.Add(new GeneratedTaskResultDto
-                {
-                    TaskId = task.Id,
-                    Title = task.Title,
-                    TaskType = task.Type.ToString(),
-                    Status = task.Status.ToString(),
-                    DueDate = task.DueDate,
-                    ScheduleId = schedule.Id,
-                    IsNew = true,
-                    Message = $"Generated from Stage '{stage.StageName}'"
-                });
-            }
-        }
-
-        return result;
+                return result;
     }
 
     public async System.Threading.Tasks.Task<TaskResponseDto?> UpdateTaskStatusAsync(Guid id, string status, Guid userId)
