@@ -813,7 +813,6 @@ public class CareScheduleService : ICareScheduleService
         return new CareScheduleResponseDto
         {
             Id = entity.Id, Title = entity.Title, Instruction = entity.Instruction,
-            TaskType = entity.TaskType,
             FrequencyDays = entity.FrequencyDays, StartDate = entity.StartDate, EndDate = entity.EndDate,
             CreatedAt = entity.CreatedAt, ExperimentId = entity.ExperimentStage?.ExperimentId ?? Guid.Empty,
             ExperimentStageId = entity.ExperimentStageId, ExperimentStageName = entity.ExperimentStage?.StageName,

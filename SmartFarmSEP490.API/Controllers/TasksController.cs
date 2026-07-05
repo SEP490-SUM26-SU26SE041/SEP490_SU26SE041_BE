@@ -52,19 +52,6 @@ public class TasksController : ControllerBase
     {
         if (!IsResearcher()) return Forbid();
         var result = await _taskService.GenerateByStageAsync(stageId, GetUserId());
-
-        if (result.HasError)
-        {
-            return BadRequest(new
-            {
-                stageId = result.StageId,
-                stageName = result.StageName,
-                totalSchedules = result.TotalSchedules,
-                existingTasksCount = result.ExistingTasksCount,
-                message = result.Message
-            });
-        }
-
         return Ok(result);
     }
 
@@ -77,20 +64,6 @@ public class TasksController : ControllerBase
         if (!IsResearcher()) return Forbid();
         if (!await IsExperimentOwnerAsync(experimentId)) return Forbid();
         var result = await _taskService.GenerateByExperimentAsync(experimentId, GetUserId());
-
-        if (result.HasError)
-        {
-            return BadRequest(new
-            {
-                experimentId = result.ExperimentId,
-                totalStages = result.TotalStages,
-                totalSchedules = result.TotalSchedules,
-                stagesSkipped = result.StagesSkipped,
-                message = result.Message,
-                stageResults = result.StageResults
-            });
-        }
-
         return Ok(result);
     }
 
