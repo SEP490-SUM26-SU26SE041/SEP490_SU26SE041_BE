@@ -15,6 +15,7 @@ public interface ITaskService
     System.Threading.Tasks.Task<System.Collections.Generic.List<TaskResponseDto>> GetTodayTasksAsync(Guid assigneeId);
     System.Threading.Tasks.Task<System.Collections.Generic.List<TaskResponseDto>> GetUpcomingTasksAsync(Guid assigneeId, int days);
     System.Threading.Tasks.Task<System.Collections.Generic.List<TaskResponseDto>> GetOverdueTasksAsync(Guid assigneeId);
+    System.Threading.Tasks.Task<System.Collections.Generic.List<TaskResponseDto>> GetResearcherCreatedTasksAsync(ResearcherCreatedTaskFilterDto filter);
     System.Threading.Tasks.Task<TaskResponseDto?> UpdateAsync(Guid id, UpdateTaskDto dto, Guid userId);
     System.Threading.Tasks.Task<bool> DeleteAsync(Guid id);
 

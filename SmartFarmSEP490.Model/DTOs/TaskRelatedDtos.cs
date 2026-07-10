@@ -1,6 +1,21 @@
 namespace SmartFarmSEP490.Model.DTOs;
 
-// ============ Task Generation DTOs ============
+// ============ Researcher-created Tasks Filter ============
+
+public class TaskFilterScope
+{
+    public const string Overdue = "overdue";
+    public const string Today = "today";
+    public const string Upcoming = "upcoming";
+}
+
+public class ResearcherCreatedTaskFilterDto
+{
+    public Guid? CreatorId { get; set; }
+    public Guid? ExperimentId { get; set; }
+    public string? Scope { get; set; }
+    public int? UpcomingDays { get; set; }
+}
 
 public class GenerateTaskFromScheduleDto
 {

@@ -152,6 +152,17 @@ public class TaskService : ITaskService
         return results;
     }
 
+    public async System.Threading.Tasks.Task<List<TaskResponseDto>> GetResearcherCreatedTasksAsync(ResearcherCreatedTaskFilterDto filter)
+    {
+        if (filter == null || !filter.CreatorId.HasValue)
+            return new List<TaskResponseDto>();
+
+        var tasks = await _taskRepository.GetResearcherCreatedTasksAsync(filter);
+        var results = new List<TaskResponseDto>();
+        foreach (var t in tasks) results.Add(await MapToResponseDto(t));
+        return results;
+    }
+
     public async System.Threading.Tasks.Task<TaskResponseDto?> UpdateAsync(Guid id, UpdateTaskDto dto, Guid userId)
     {
         var task = await _taskRepository.GetByIdAsync(id);
