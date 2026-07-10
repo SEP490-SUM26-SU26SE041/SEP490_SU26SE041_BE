@@ -232,6 +232,36 @@ public class TasksController : ControllerBase
         return Ok(await _taskService.GetOverdueTasksAsync(GetUserId()));
     }
 
+    /// <summary>
+    /// Lay tat ca task do researcher (creator) tao ra, co the filter theo:
+    ///   - creatorId      : id researcher can xem (phai truyen, mac dinh = JWT user neu khong co)
+    ///   - experimentId   : loc theo thuc nghiem cua researcher do
+    ///   - scope          : overdue | today | upcoming (mac dinh = tat ca)
+    ///   - upcomingDays   : so ngay cho scope=upcoming (mac dinh 7)
+    /// Chi researcher moi goi duoc, va chi duoc xem task cua chinh minh.
+    /// </summary>
+    [HttpGet("researcher/created")]
+    [Authorize(Roles = "Researcher")]
+    public async Task<IActionResult> GetResearcherCreatedTasks(
+        [FromQuery] Guid? creatorId,
+        [FromQuery] Guid? experimentId,
+        [FromQuery] string? scope,
+        [FromQuery] int? upcomingDays)
+    {
+        var targetCreatorId = creatorId ?? GetUserId();
+        if (targetCreatorId != GetUserId()) return Forbid();
+
+        var filter = new ResearcherCreatedTaskFilterDto
+        {
+            CreatorId = targetCreatorId,
+            ExperimentId = experimentId,
+            Scope = scope,
+            UpcomingDays = upcomingDays
+        };
+
+        return Ok(await _taskService.GetResearcherCreatedTasksAsync(filter));
+    }
+
     // ========== Task Status ==========
 
     /// <summary>

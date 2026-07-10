@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using SmartFarmSEP490.Model;
+using SmartFarmSEP490.Model.DTOs;
 using SmartFarmSEP490.Repository.DbContexts;
 using SmartFarmSEP490.Repository.Interfaces.Tasks;
 using Task = System.Threading.Tasks.Task;
@@ -101,6 +102,54 @@ public class TaskRepository : ITaskRepository
                 && t.Status != completedStatus)
             .OrderBy(t => t.DueDate)
             .ToListAsync();
+    }
+
+    public async Task<List<Model.Task>> GetResearcherCreatedTasksAsync(ResearcherCreatedTaskFilterDto filter)
+    {
+        var completedStatus = SmartFarmSEP490.Model.Enums.TaskStatus.Completed;
+        var cancelledStatus = SmartFarmSEP490.Model.Enums.TaskStatus.Cancelled;
+        var now = DateTime.UtcNow;
+        var today = now.Date;
+        var tomorrow = today.AddDays(1);
+        var upcomingDays = filter.UpcomingDays ?? 7;
+        var future = today.AddDays(upcomingDays);
+
+        var query = FullQuery().Where(t => t.CreatedBy == filter.CreatorId);
+
+        if (filter.ExperimentId.HasValue)
+            query = query.Where(t => t.ExperimentId == filter.ExperimentId.Value);
+
+        var scope = (filter.Scope ?? string.Empty).Trim().ToLowerInvariant();
+        switch (scope)
+        {
+            case TaskFilterScope.Overdue:
+                query = query.Where(t => t.DueDate.HasValue
+                    && t.DueDate.Value < now
+                    && t.Status != completedStatus
+                    && t.Status != cancelledStatus);
+                query = query.OrderBy(t => t.DueDate);
+                break;
+
+            case TaskFilterScope.Today:
+                query = query.Where(t => t.DueDate.HasValue
+                    && t.DueDate.Value >= today
+                    && t.DueDate.Value < tomorrow);
+                query = query.OrderBy(t => t.DueDate);
+                break;
+
+            case TaskFilterScope.Upcoming:
+                query = query.Where(t => t.DueDate.HasValue
+                    && t.DueDate.Value >= tomorrow
+                    && t.DueDate.Value <= future);
+                query = query.OrderBy(t => t.DueDate);
+                break;
+
+            default:
+                query = query.OrderByDescending(t => t.CreatedAt);
+                break;
+        }
+
+        return await query.ToListAsync();
     }
 
     public async Task<Model.Task> AddAsync(Model.Task task)

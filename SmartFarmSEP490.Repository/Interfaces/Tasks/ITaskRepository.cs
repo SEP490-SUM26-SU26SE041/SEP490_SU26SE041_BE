@@ -1,4 +1,5 @@
 using SmartFarmSEP490.Model;
+using SmartFarmSEP490.Model.DTOs;
 using Task = System.Threading.Tasks.Task;
 
 namespace SmartFarmSEP490.Repository.Interfaces.Tasks;
@@ -14,6 +15,7 @@ public interface ITaskRepository
     Task<List<Model.Task>> GetTodayTasksAsync(Guid assigneeId);
     Task<List<Model.Task>> GetUpcomingTasksAsync(Guid assigneeId, int days);
     Task<List<Model.Task>> GetOverdueTasksAsync(Guid assigneeId);
+    Task<List<Model.Task>> GetResearcherCreatedTasksAsync(ResearcherCreatedTaskFilterDto filter);
     Task<Model.Task> AddAsync(Model.Task task);
     Task UpdateAsync(Model.Task task);
     Task DeleteAsync(Guid id);
