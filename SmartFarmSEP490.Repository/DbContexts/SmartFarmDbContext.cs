@@ -126,7 +126,7 @@ public partial class SmartFarmDbContext : DbContext
                 .HasDefaultValueSql("now()")
                 .HasColumnType("timestamp without time zone");
             entity.Property(e => e.MatchScore).HasPrecision(5, 4);
-            entity.Property(e => e.ReviewStatus).HasColumnType("AIReviewStatus");
+            entity.Property(e => e.ReviewStatus).HasColumnType("public.\"AIReviewStatus\"");
 
             entity.HasOne(d => d.ReviewedByNavigation).WithMany(p => p.AitaskAssignmentSuggestionReviewedByNavigations)
                 .HasForeignKey(d => d.ReviewedBy)
@@ -154,7 +154,7 @@ public partial class SmartFarmDbContext : DbContext
                 .HasColumnType("timestamp without time zone");
             entity.Property(e => e.IsResolved).HasDefaultValue(false);
             entity.Property(e => e.ResolvedAt).HasColumnType("timestamp without time zone");
-            entity.Property(e => e.Severity).HasColumnType("AlertSeverity");
+            entity.Property(e => e.Severity).HasColumnType("public.\"AlertSeverity\"");
             entity.Property(e => e.Title).HasMaxLength(150);
 
             entity.HasOne(d => d.Batch).WithMany(p => p.Alerts)
@@ -189,7 +189,7 @@ public partial class SmartFarmDbContext : DbContext
                 .HasColumnType("timestamp without time zone");
             entity.Property(e => e.DeletedAt).HasColumnType("timestamp without time zone");
             entity.Property(e => e.EnvironmentType).HasMaxLength(50);
-            entity.Property(e => e.Status).HasColumnType("LocationStatus");
+            entity.Property(e => e.Status).HasColumnType("public.\"LocationStatus\"");
             entity.Property(e => e.TotalArea).HasPrecision(10, 2);
             entity.Property(e => e.UpdatedAt)
                 .HasDefaultValueSql("now()")
@@ -228,7 +228,7 @@ public partial class SmartFarmDbContext : DbContext
                 .HasDefaultValueSql("now()")
                 .HasColumnType("timestamp without time zone");
             entity.Property(e => e.DeletedAt).HasColumnType("timestamp without time zone");
-            entity.Property(e => e.Status).HasColumnType("BatchStatus");
+            entity.Property(e => e.Status).HasColumnType("public.\"BatchStatus\"");
 
             entity.HasOne(d => d.CropVariety).WithMany(p => p.Batches)
                 .HasForeignKey(d => d.CropVarietyId)
@@ -285,7 +285,7 @@ public partial class SmartFarmDbContext : DbContext
             entity.Property(e => e.CreatedAt)
                 .HasDefaultValueSql("now()")
                 .HasColumnType("timestamp without time zone");
-            entity.Property(e => e.TaskType).HasColumnType("TaskType");
+            entity.Property(e => e.TaskType).HasColumnType("public.\"TaskType\"");
             entity.Property(e => e.Title).HasMaxLength(150);
 
             entity.HasOne(d => d.Batch).WithMany(p => p.CareSchedules)
@@ -381,7 +381,7 @@ public partial class SmartFarmDbContext : DbContext
                 .HasConstraintName("Experiments_ResearcherId_fkey");
 
             entity.Property(e => e.Status)
-                .HasColumnType("ExperimentStatus")
+                .HasColumnType("public.\"ExperimentStatus\"")
                 .HasDefaultValueSql("'Active'::\"ExperimentStatus\"");
         });
 
@@ -394,7 +394,7 @@ public partial class SmartFarmDbContext : DbContext
             entity.HasIndex(e => e.ExperimentId, "IX_ExperimentBedAssignments_ExperimentId");
 
             entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
-            entity.Property(e => e.Status).HasColumnType("AllocationStatus");
+            entity.Property(e => e.Status).HasColumnType("public.\"AllocationStatus\"");
 
             entity.HasOne(d => d.Bed).WithMany(p => p.ExperimentBedAssignments)
                 .HasForeignKey(d => d.BedId)
@@ -420,7 +420,7 @@ public partial class SmartFarmDbContext : DbContext
 
             entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
             entity.Property(e => e.DesignParameters).HasColumnType("jsonb");
-            entity.Property(e => e.DesignType).HasColumnType("DesignType");
+            entity.Property(e => e.DesignType).HasColumnType("public.\"DesignType\"");
 
             entity.HasOne(d => d.Experiment).WithOne(p => p.ExperimentDesign)
                 .HasForeignKey<ExperimentDesign>(d => d.ExperimentId)
@@ -440,7 +440,7 @@ public partial class SmartFarmDbContext : DbContext
                 .HasDefaultValueSql("now()")
                 .HasColumnType("timestamp without time zone");
             entity.Property(e => e.GroupName).HasMaxLength(100);
-            entity.Property(e => e.GroupType).HasColumnType("GroupType");
+            entity.Property(e => e.GroupType).HasColumnType("public.\"GroupType\"");
 
             entity.HasOne(d => d.Experiment).WithMany(p => p.ExperimentGroups)
                 .HasForeignKey(d => d.ExperimentId)
@@ -507,7 +507,7 @@ public partial class SmartFarmDbContext : DbContext
                 .HasConstraintName("ExperimentRequests_ResearcherId_fkey");
 
             entity.Property(e => e.Status)
-                .HasColumnType("RequestStatus")
+                .HasColumnType("public.\"RequestStatus\"")
                 .HasDefaultValueSql("'Pending'::\"RequestStatus\"");
         });
 
@@ -525,7 +525,7 @@ public partial class SmartFarmDbContext : DbContext
                 .HasColumnType("timestamp without time zone");
             entity.Property(e => e.ResultData).HasColumnType("jsonb");
             entity.Property(e => e.StageName).HasMaxLength(100);
-            entity.Property(e => e.StageType).HasColumnType("ExperimentStageType");
+            entity.Property(e => e.StageType).HasColumnType("public.\"ExperimentStageType\"");
             entity.Property(e => e.UpdatedAt)
                 .HasDefaultValueSql("now()")
                 .HasColumnType("timestamp without time zone");
@@ -571,7 +571,7 @@ public partial class SmartFarmDbContext : DbContext
             entity.Property(e => e.CreatedAt)
                 .HasDefaultValueSql("now()")
                 .HasColumnType("timestamp without time zone");
-            entity.Property(e => e.Status).HasColumnType("DocumentStatus");
+            entity.Property(e => e.Status).HasColumnType("public.\"DocumentStatus\"");
             entity.Property(e => e.Title).HasMaxLength(200);
 
             entity.HasOne(d => d.CropVariety).WithMany(p => p.KnowledgeDocuments)
@@ -637,6 +637,7 @@ public partial class SmartFarmDbContext : DbContext
             entity.Property(e => e.MeasuredAt)
                 .HasDefaultValueSql("now()")
                 .HasColumnType("timestamp without time zone");
+            entity.Property(e => e.DeletedAt).HasColumnType("timestamp without time zone");
             entity.Property(e => e.Value).HasPrecision(12, 4);
 
             entity.HasOne(d => d.Batch).WithMany(p => p.MeasurementRecords)
@@ -763,7 +764,7 @@ public partial class SmartFarmDbContext : DbContext
 
             entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
             entity.Property(e => e.Title).HasMaxLength(150);
-            entity.Property(e => e.StageType).HasColumnType("ExperimentStageType");
+            entity.Property(e => e.StageType).HasColumnType("public.\"ExperimentStageType\"");
 
             entity.HasOne(d => d.Template).WithMany(p => p.ProcedureTemplateSteps)
                 .HasForeignKey(d => d.TemplateId)
@@ -777,7 +778,7 @@ public partial class SmartFarmDbContext : DbContext
             entity.HasIndex(e => e.RequestId, "IX_RequestReviews_RequestId");
 
             entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
-            entity.Property(e => e.Result).HasColumnType("ReviewResult");
+            entity.Property(e => e.Result).HasColumnType("public.\"ReviewResult\"");
             entity.Property(e => e.ReviewedAt)
                 .HasDefaultValueSql("now()")
                 .HasColumnType("timestamp without time zone");
@@ -815,7 +816,7 @@ public partial class SmartFarmDbContext : DbContext
                 .HasDefaultValueSql("now()")
                 .HasColumnType("timestamp without time zone");
             entity.Property(e => e.SensorCode).HasMaxLength(50);
-            entity.Property(e => e.SensorType).HasColumnType("SensorType");
+            entity.Property(e => e.SensorType).HasColumnType("public.\"SensorType\"");
         });
 
         modelBuilder.Entity<SensorDatum>(entity =>
@@ -891,12 +892,13 @@ public partial class SmartFarmDbContext : DbContext
                 .HasDefaultValueSql("now()")
                 .HasColumnType("timestamp without time zone");
             entity.Property(e => e.DueDate).HasColumnType("timestamp without time zone");
-            entity.Property(e => e.Status).HasColumnName("Status").HasColumnType("TaskStatus");
+            entity.Property(e => e.Status).HasColumnName("Status").HasColumnType("public.\"TaskStatus\"");
             entity.Property(e => e.Title).HasMaxLength(150);
-            entity.Property(e => e.Type).HasColumnName("TaskType").HasColumnType("TaskType");
+            entity.Property(e => e.Type).HasColumnName("TaskType").HasColumnType("public.\"TaskType\"");
             entity.Property(e => e.UpdatedAt)
                 .HasDefaultValueSql("now()")
                 .HasColumnType("timestamp without time zone");
+            entity.Property(e => e.CreatedBy).HasColumnName("CreatedBy");
 
             entity.HasOne(d => d.AssignedToNavigation).WithMany(p => p.TaskAssignedToNavigations)
                 .HasForeignKey(d => d.AssignedTo)
@@ -939,7 +941,7 @@ public partial class SmartFarmDbContext : DbContext
                 .HasDefaultValueSql("now()")
                 .HasColumnType("timestamp without time zone");
             entity.Property(e => e.EndedAt).HasColumnType("timestamp without time zone");
-            entity.Property(e => e.Status).HasColumnType("TaskAssignmentStatus");
+            entity.Property(e => e.Status).HasColumnType("public.\"TaskAssignmentStatus\"");
 
             entity.HasOne(d => d.AssignedByNavigation).WithMany(p => p.TaskAssignmentAssignedByNavigations)
                 .HasForeignKey(d => d.AssignedBy)

@@ -19,4 +19,11 @@ public interface ITaskRepository
     Task<Model.Task> AddAsync(Model.Task task);
     Task UpdateAsync(Model.Task task);
     Task DeleteAsync(Guid id);
+
+    // My Tasks — filter for the "MY" endpoint (assignee = me + optional status/batch/experiment)
+    Task<List<Model.Task>> GetMyTasksAsync(Guid assigneeId, MyTaskFilterDto filter, CancellationToken ct = default);
+
+    // Overdue sweep (UTC-based, idempotent)
+    Task<List<Model.Task>> GetOverdueCandidatesAsync(DateTime asOfUtc, CancellationToken ct = default);
+    Task<int> MarkOverdueAsync(DateTime asOfUtc, CancellationToken ct = default);
 }

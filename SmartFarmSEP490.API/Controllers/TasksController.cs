@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using SmartFarmSEP490.Model.DTOs;
 using SmartFarmSEP490.Repository.Interfaces.Experiments;
 using SmartFarmSEP490.Service.Interfaces.Tasks;
@@ -14,13 +15,19 @@ public class TasksController : ControllerBase
 {
     private readonly ITaskService _taskService;
     private readonly IExperimentRepository _experimentRepository;
+    private readonly IOverdueTaskService _overdueTaskService;
+    private readonly ILogger<TasksController> _logger;
 
     public TasksController(
         ITaskService taskService,
-        IExperimentRepository experimentRepository)
+        IExperimentRepository experimentRepository,
+        IOverdueTaskService overdueTaskService,
+        ILogger<TasksController> logger)
     {
         _taskService = taskService;
         _experimentRepository = experimentRepository;
+        _overdueTaskService = overdueTaskService;
+        _logger = logger;
     }
 
     private Guid GetUserId() => Guid.Parse(User.FindFirstValue(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)
@@ -197,12 +204,29 @@ public class TasksController : ControllerBase
     }
 
     /// <summary>
-    /// Get My Tasks - JWT User
+    /// Get My Tasks — task được assign cho JWT user hiện tại.
+    /// Query params (tất cả optional, AND):
+    ///   - status=Pending,InProgress,Overdue,Completed,Cancelled  (lặp lại nhiều lần để OR)
+    ///   - batchId={guid}
+    ///   - experimentId={guid}
+    /// Ví dụ:
+    ///   GET /api/tasks/my
+    ///   GET /api/tasks/my?status=Pending&status=Overdue
+    ///   GET /api/tasks/my?batchId={guid}&experimentId={guid}&status=InProgress
     /// </summary>
     [HttpGet("my")]
-    public async Task<IActionResult> GetMyTasks()
+    public async Task<IActionResult> GetMyTasks(
+        [FromQuery(Name = "status")] string[]? statuses,
+        [FromQuery] Guid? batchId,
+        [FromQuery] Guid? experimentId)
     {
-        return Ok(await _taskService.GetByAssigneeAsync(GetUserId()));
+        var filter = new MyTaskFilterDto
+        {
+            Statuses = statuses?.ToList(),
+            BatchId = batchId,
+            ExperimentId = experimentId
+        };
+        return Ok(await _taskService.GetMyTasksAsync(GetUserId(), filter));
     }
 
     /// <summary>
@@ -400,5 +424,29 @@ public class TasksController : ControllerBase
         if (!await IsExperimentOwnerAsync(task.ExperimentId)) return Forbid();
 
         return Ok(await _taskService.FindMatchingUsersAsync(taskId));
+    }
+
+    // ========== Admin / Debug ==========
+
+    /// <summary>
+    /// Trigger manual sweep over (DueDate &lt; now UTC) → Overdue.
+    /// Trả về số task bị update. Dùng để test/debug khi không muốn đợi cron 00:00 ICT.
+    /// Endpoint này nên khóa quyền admin trong production — tạm để [Authorize] mặc định.
+    /// </summary>
+    [HttpPost("admin/sweep-overdue")]
+    [Authorize(Roles = "Researcher,Admin")]
+    public async Task<IActionResult> ManualSweepOverdue()
+    {
+        var affected = await _overdueTaskService.SweepAsync();
+        var nowUtc = DateTime.UtcNow;
+        _logger.LogInformation(
+            "[Admin] Manual sweep-overdue: {Count} task(s) marked Overdue at {Now:O} UTC",
+            affected, nowUtc);
+        return Ok(new
+        {
+            affected,
+            nowUtc,
+            note = "Tasks with DueDate < nowUtc and Status IN (Pending, InProgress) were marked Overdue."
+        });
     }
 }

@@ -93,6 +93,9 @@ public class TaskReportResponseDto
     public string? ReportText { get; set; }
     public object? ResultData { get; set; }
     public DateTime ReportedAt { get; set; }
+    public Guid? CreatedBy { get; set; }
+    public Guid? UpdatedBy { get; set; }
+    public DateTime? UpdatedAt { get; set; }
     public List<PlantImageResponseDto> Images { get; set; } = new();
 }
 
@@ -137,6 +140,9 @@ public class MeasurementRecordResponseDto
     public Guid? MeasuredBy { get; set; }
     public string? MeasuredByName { get; set; }
     public DateTime MeasuredAt { get; set; }
+    public Guid? CreatedBy { get; set; }
+    public Guid? UpdatedBy { get; set; }
+    public DateTime? UpdatedAt { get; set; }
 }
 
 // ============ Plant Image / Task Image DTOs ============

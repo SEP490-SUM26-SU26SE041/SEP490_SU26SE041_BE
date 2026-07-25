@@ -25,6 +25,8 @@ public partial class MeasurementRecord
 
     public DateTime MeasuredAt { get; set; }
 
+    public DateTime? DeletedAt { get; set; }
+
     public virtual Batch Batch { get; set; } = null!;
 
     public virtual Experiment Experiment { get; set; } = null!;

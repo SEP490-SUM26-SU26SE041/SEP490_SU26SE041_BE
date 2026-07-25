@@ -49,7 +49,7 @@ public class TaskReportService : ITaskReportService
         return await MapToResponseDto(report);
     }
 
-    public async System.Threading.Tasks.Task<TaskReportResponseDto?> UpdateAsync(Guid id, UpdateTaskReportDto dto)
+    public async System.Threading.Tasks.Task<TaskReportResponseDto?> UpdateAsync(Guid id, UpdateTaskReportDto dto, Guid userId)
     {
         var existing = await _reportRepository.GetByIdAsync(id);
         if (existing == null) return null;
@@ -81,6 +81,15 @@ public class TaskReportService : ITaskReportService
         var results = new List<TaskReportResponseDto>();
         foreach (var r in reports) results.Add(await MapToResponseDto(r));
         return results;
+    }
+
+    public async System.Threading.Tasks.Task<bool> DeleteAsync(Guid id)
+    {
+        var existing = await _reportRepository.GetByIdAsync(id);
+        if (existing == null) return false;
+
+        await _reportRepository.DeleteAsync(id);
+        return true;
     }
 
     private async System.Threading.Tasks.Task<TaskReportResponseDto> MapToResponseDto(TaskReport report)

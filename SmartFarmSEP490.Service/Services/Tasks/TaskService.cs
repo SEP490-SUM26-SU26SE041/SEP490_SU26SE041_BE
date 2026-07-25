@@ -8,6 +8,7 @@ using SmartFarmSEP490.Repository.Interfaces.CareSchedules;
 using SmartFarmSEP490.Repository.Interfaces.ExperimentStages;
 using SmartFarmSEP490.Repository.Interfaces.Experiments;
 using SmartFarmSEP490.Repository.Interfaces.Tasks;
+using SmartFarmSEP490.Service.Helpers;
 using SmartFarmSEP490.Service.Interfaces.Tasks;
 
 namespace SmartFarmSEP490.Service.Services.Tasks;
@@ -22,6 +23,7 @@ public class TaskService : ITaskService
     private readonly ICareScheduleRepository _careScheduleRepository;
     private readonly IBatchRepository _batchRepository;
     private readonly IUserRepository _userRepository;
+    private readonly IOverdueTaskService _overdueTaskService;
     private readonly SmartFarmDbContext _context;
 
     private static readonly string[] AssignableRoles = { "Technician", "Student" };
@@ -35,6 +37,7 @@ public class TaskService : ITaskService
         ICareScheduleRepository careScheduleRepository,
         IBatchRepository batchRepository,
         IUserRepository userRepository,
+        IOverdueTaskService overdueTaskService,
         SmartFarmDbContext context)
     {
         _taskRepository = taskRepository;
@@ -45,6 +48,7 @@ public class TaskService : ITaskService
         _careScheduleRepository = careScheduleRepository;
         _batchRepository = batchRepository;
         _userRepository = userRepository;
+        _overdueTaskService = overdueTaskService;
         _context = context;
     }
 
@@ -60,6 +64,17 @@ public class TaskService : ITaskService
         var experiment = await _experimentRepository.GetByIdAsync(dto.ExperimentId);
         if (experiment == null) return null;
 
+        if (string.IsNullOrWhiteSpace(dto.Title) || dto.Title.Trim().Length < 3)
+            return null;
+
+        if (dto.DueDate.HasValue && dto.DueDate.Value < DateTime.UtcNow)
+            return null;
+
+        // FE gửi DueDate theo giờ Việt Nam → convert sang UTC trước khi lưu
+        var dueDateUtc = dto.DueDate.HasValue
+            ? VietnamTime.ToUtcFromVietnam(dto.DueDate.Value)
+            : (DateTime?)null;
+
         var task = new Model.Task
         {
             Id = Guid.NewGuid(),
@@ -72,7 +87,7 @@ public class TaskService : ITaskService
             Title = dto.Title,
             Description = dto.Description,
             RequiredSkillDescription = dto.RequiredSkillDescription,
-            DueDate = dto.DueDate,
+            DueDate = dueDateUtc,
             Status = Model.Enums.TaskStatus.Pending,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
@@ -90,6 +105,7 @@ public class TaskService : ITaskService
 
     public async System.Threading.Tasks.Task<List<TaskResponseDto>> GetByExperimentAsync(Guid experimentId)
     {
+        await TrySweepOverdueAsync();
         var tasks = await _taskRepository.GetByExperimentAsync(experimentId);
         var results = new List<TaskResponseDto>();
         foreach (var t in tasks) results.Add(await MapToResponseDto(t));
@@ -98,6 +114,7 @@ public class TaskService : ITaskService
 
     public async System.Threading.Tasks.Task<List<TaskResponseDto>> GetByStageAsync(Guid stageId)
     {
+        await TrySweepOverdueAsync();
         var tasks = await _taskRepository.GetByStageAsync(stageId);
         var results = new List<TaskResponseDto>();
         foreach (var t in tasks) results.Add(await MapToResponseDto(t));
@@ -106,6 +123,7 @@ public class TaskService : ITaskService
 
     public async System.Threading.Tasks.Task<List<TaskResponseDto>> GetByBatchAsync(Guid batchId)
     {
+        await TrySweepOverdueAsync();
         var tasks = await _taskRepository.GetByBatchAsync(batchId);
         var results = new List<TaskResponseDto>();
         foreach (var t in tasks) results.Add(await MapToResponseDto(t));
@@ -114,7 +132,17 @@ public class TaskService : ITaskService
 
     public async System.Threading.Tasks.Task<List<TaskResponseDto>> GetByAssigneeAsync(Guid assigneeId)
     {
+        await TrySweepOverdueAsync();
         var tasks = await _taskRepository.GetByAssigneeAsync(assigneeId);
+        var results = new List<TaskResponseDto>();
+        foreach (var t in tasks) results.Add(await MapToResponseDto(t));
+        return results;
+    }
+
+    public async System.Threading.Tasks.Task<List<TaskResponseDto>> GetMyTasksAsync(Guid assigneeId, MyTaskFilterDto filter)
+    {
+        await TrySweepOverdueAsync();
+        var tasks = await _taskRepository.GetMyTasksAsync(assigneeId, filter ?? new MyTaskFilterDto());
         var results = new List<TaskResponseDto>();
         foreach (var t in tasks) results.Add(await MapToResponseDto(t));
         return results;
@@ -122,6 +150,7 @@ public class TaskService : ITaskService
 
     public async System.Threading.Tasks.Task<List<TaskResponseDto>> GetAllAsync()
     {
+        await TrySweepOverdueAsync();
         var tasks = await _taskRepository.GetAllAsync();
         var results = new List<TaskResponseDto>();
         foreach (var t in tasks) results.Add(await MapToResponseDto(t));
@@ -130,6 +159,7 @@ public class TaskService : ITaskService
 
     public async System.Threading.Tasks.Task<List<TaskResponseDto>> GetTodayTasksAsync(Guid assigneeId)
     {
+        await TrySweepOverdueAsync();
         var tasks = await _taskRepository.GetTodayTasksAsync(assigneeId);
         var results = new List<TaskResponseDto>();
         foreach (var t in tasks) results.Add(await MapToResponseDto(t));
@@ -138,6 +168,7 @@ public class TaskService : ITaskService
 
     public async System.Threading.Tasks.Task<List<TaskResponseDto>> GetUpcomingTasksAsync(Guid assigneeId, int days)
     {
+        await TrySweepOverdueAsync();
         var tasks = await _taskRepository.GetUpcomingTasksAsync(assigneeId, days);
         var results = new List<TaskResponseDto>();
         foreach (var t in tasks) results.Add(await MapToResponseDto(t));
@@ -146,6 +177,7 @@ public class TaskService : ITaskService
 
     public async System.Threading.Tasks.Task<List<TaskResponseDto>> GetOverdueTasksAsync(Guid assigneeId)
     {
+        await TrySweepOverdueAsync();
         var tasks = await _taskRepository.GetOverdueTasksAsync(assigneeId);
         var results = new List<TaskResponseDto>();
         foreach (var t in tasks) results.Add(await MapToResponseDto(t));
@@ -157,16 +189,30 @@ public class TaskService : ITaskService
         if (filter == null || !filter.CreatorId.HasValue)
             return new List<TaskResponseDto>();
 
+        await TrySweepOverdueAsync();
         var tasks = await _taskRepository.GetResearcherCreatedTasksAsync(filter);
         var results = new List<TaskResponseDto>();
         foreach (var t in tasks) results.Add(await MapToResponseDto(t));
         return results;
     }
 
+    /// <summary>Lazy sweep — chạy trước read để user thấy status đúng. Không throw nếu lỗi.</summary>
+    private async Task TrySweepOverdueAsync()
+    {
+        try { await _overdueTaskService.SweepAsync(); }
+        catch { /* lazy path: nuốt lỗi để không ảnh hưởng read */ }
+    }
+
     public async System.Threading.Tasks.Task<TaskResponseDto?> UpdateAsync(Guid id, UpdateTaskDto dto, Guid userId)
     {
         var task = await _taskRepository.GetByIdAsync(id);
         if (task == null) return null;
+
+        if (!string.IsNullOrEmpty(dto.Title) && dto.Title.Trim().Length < 3)
+            return null;
+
+        if (dto.DueDate.HasValue && dto.DueDate.Value < DateTime.UtcNow)
+            return null;
 
         if (dto.ExperimentStageId != null) task.ExperimentStageId = dto.ExperimentStageId;
         if (dto.BatchId != null) task.BatchId = dto.BatchId;
@@ -175,7 +221,8 @@ public class TaskService : ITaskService
         if (!string.IsNullOrEmpty(dto.Title)) task.Title = dto.Title;
         if (dto.Description != null) task.Description = dto.Description;
         if (dto.RequiredSkillDescription != null) task.RequiredSkillDescription = dto.RequiredSkillDescription;
-        if (dto.DueDate.HasValue) task.DueDate = dto.DueDate;
+        // FE gửi DueDate theo giờ Việt Nam → convert sang UTC trước khi lưu
+        if (dto.DueDate.HasValue) task.DueDate = VietnamTime.ToUtcFromVietnam(dto.DueDate.Value);
         if (!string.IsNullOrEmpty(dto.Status)) task.Status = Enum.TryParse<Model.Enums.TaskStatus>(dto.Status, ignoreCase: true, out var ts) ? ts : task.Status;
         task.UpdatedAt = DateTime.UtcNow;
 
@@ -305,14 +352,16 @@ public class TaskService : ITaskService
             {
                 foreach (var dueDate in dueDates)
                 {
-                    var dueDateTime = dueDate.ToDateTime(TimeOnly.MinValue);
+                    // dueDate là DateOnly theo giờ Việt Nam → convert sang UTC (midnight ICT = 17:00 UTC ngày hôm trước)
+                    var dueDateLocalMidnight = dueDate.ToDateTime(TimeOnly.MinValue);
+                    var dueDateUtc = VietnamTime.ToUtcFromVietnam(dueDateLocalMidnight);
 
                     var existing = await _taskRepository.GetByBatchAsync(batchId);
                     var alreadyExists = existing.Any(t =>
                         t.CareScheduleId == schedule.Id &&
                         t.Status != Model.Enums.TaskStatus.Completed &&
                         t.DueDate.HasValue &&
-                        t.DueDate.Value.Date == dueDateTime.Date);
+                        t.DueDate.Value.Date == dueDateUtc.Date);
 
                     if (alreadyExists)
                     {
@@ -331,7 +380,7 @@ public class TaskService : ITaskService
                         Type = schedule.TaskType,
                         Title = schedule.Title,
                         Description = schedule.Instruction,
-                        DueDate = dueDateTime,
+                        DueDate = dueDateUtc,
                         Status = Model.Enums.TaskStatus.Pending,
                         CreatedAt = DateTime.UtcNow,
                         UpdatedAt = DateTime.UtcNow
@@ -424,8 +473,13 @@ public class TaskService : ITaskService
         var isAllowedRole = assignee.UserRoles.Any(ur => AssignableRoles.Contains(ur.Role.RoleName));
         if (!isAllowedRole) return null;
 
-        var existingActive = await _assignmentRepository.GetActiveByTaskAndAssigneeAsync(dto.TaskId, dto.AssigneeId);
-        if (existingActive != null) return null;
+    var existingActive = await _assignmentRepository.GetActiveByTaskAndAssigneeAsync(dto.TaskId, dto.AssigneeId);
+    if (existingActive != null)
+        throw new InvalidOperationException("Task nay da duoc giao cho nguoi nay, khong the giao lai.");
+
+    var allAssignments = await _assignmentRepository.GetByTaskIdAsync(dto.TaskId);
+    if (allAssignments.Any(a => a.EndedAt == null))
+        throw new InvalidOperationException("Task da co nguoi lam roi, khong the giao them.");
 
         var assignment = new Model.TaskAssignment
         {
@@ -628,7 +682,7 @@ public class TaskService : ITaskService
             AssignedTo = task.AssignedTo,
             AssignedToName = task.AssignedToNavigation?.FullName,
             SkillRequirements = skillReqDtos,
-            Assignments = assignmentDtos
+            Assignments = assignmentDtos,
         };
     }
 
@@ -659,7 +713,7 @@ public class TaskService : ITaskService
             Reason = assignment.Reason,
             Status = assignment.Status.ToString(),
             AssignedAt = assignment.AssignedAt,
-            EndedAt = assignment.EndedAt
+            EndedAt = assignment.EndedAt,
         };
     }
 }

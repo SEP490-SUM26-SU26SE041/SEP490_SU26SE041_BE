@@ -4,6 +4,7 @@ using SmartFarmSEP490.Model.DTOs;
 using SmartFarmSEP490.Repository.DbContexts;
 using SmartFarmSEP490.Repository.Interfaces.Tasks;
 using Task = System.Threading.Tasks.Task;
+using TaskStatus = SmartFarmSEP490.Model.Enums.TaskStatus;
 
 namespace SmartFarmSEP490.Repository.Implementations.Tasks;
 
@@ -59,6 +60,38 @@ public class TaskRepository : ITaskRepository
             .Where(t => t.AssignedTo == assigneeId)
             .OrderByDescending(t => t.DueDate)
             .ToListAsync();
+
+    public async Task<List<Model.Task>> GetMyTasksAsync(Guid assigneeId, MyTaskFilterDto filter, CancellationToken ct = default)
+    {
+        // Chuẩn hóa filter (lowercase, trim, distinct, loại rỗng)
+        var rawStatuses = filter?.Statuses ?? new List<string>();
+        var statusEnums = new List<TaskStatus>();
+        foreach (var raw in rawStatuses)
+        {
+            if (string.IsNullOrWhiteSpace(raw)) continue;
+            if (Enum.TryParse<TaskStatus>(raw.Trim(), ignoreCase: true, out var parsed))
+                statusEnums.Add(parsed);
+        }
+        var distinctStatuses = statusEnums.Distinct().ToList();
+
+        var query = FullQuery().Where(t => t.AssignedTo == assigneeId);
+
+        if (filter != null)
+        {
+            if (filter.BatchId.HasValue)
+                query = query.Where(t => t.BatchId == filter.BatchId.Value);
+
+            if (filter.ExperimentId.HasValue)
+                query = query.Where(t => t.ExperimentId == filter.ExperimentId.Value);
+
+            if (distinctStatuses.Count > 0)
+                query = query.Where(t => distinctStatuses.Contains(t.Status));
+        }
+
+        return await query
+            .OrderByDescending(t => t.DueDate)
+            .ToListAsync(ct);
+    }
 
     public async Task<List<Model.Task>> GetAllAsync() =>
         await FullQuery()
@@ -173,5 +206,28 @@ public class TaskRepository : ITaskRepository
             _context.Tasks.Remove(task);
             await _context.SaveChangesAsync();
         }
+    }
+
+    public async Task<List<Model.Task>> GetOverdueCandidatesAsync(DateTime asOfUtc, CancellationToken ct = default)
+    {
+        return await _context.Tasks
+            .AsNoTracking()
+            .Where(t => t.DueDate != null
+                     && t.DueDate < asOfUtc
+                     && (t.Status == TaskStatus.Pending || t.Status == TaskStatus.InProgress))
+            .OrderBy(t => t.DueDate)
+            .ToListAsync(ct);
+    }
+
+    public async Task<int> MarkOverdueAsync(DateTime asOfUtc, CancellationToken ct = default)
+    {
+        // Single SQL UPDATE — idempotent vì WHERE Status IN (Pending, InProgress)
+        return await _context.Tasks
+            .Where(t => t.DueDate != null
+                     && t.DueDate < asOfUtc
+                     && (t.Status == TaskStatus.Pending || t.Status == TaskStatus.InProgress))
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(t => t.Status, TaskStatus.Overdue)
+                .SetProperty(t => t.UpdatedAt, DateTime.UtcNow), ct);
     }
 }
