@@ -55,7 +55,7 @@ public class TaskReportsController : ControllerBase
 
         if (existing.ReporterId != GetUserId()) return Forbid();
 
-        var result = await _reportService.UpdateAsync(id, dto);
+        var result = await _reportService.UpdateAsync(id, dto, GetUserId());
         return result == null ? NotFound() : Ok(result);
     }
 
@@ -85,5 +85,20 @@ public class TaskReportsController : ControllerBase
     {
         var result = await _reportService.GetByIdAsync(id);
         return result == null ? NotFound() : Ok(result);
+    }
+
+    /// <summary>
+    /// Delete Task Report
+    /// </summary>
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> Delete(Guid id)
+    {
+        var existing = await _reportService.GetByIdAsync(id);
+        if (existing == null) return NotFound();
+
+        if (existing.ReporterId != GetUserId()) return Forbid();
+
+        var deleted = await _reportService.DeleteAsync(id);
+        return deleted ? NoContent() : NotFound();
     }
 }

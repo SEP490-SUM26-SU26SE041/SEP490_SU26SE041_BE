@@ -11,17 +11,35 @@ public class MeasurementRecordRepository : IMeasurementRecordRepository
     private readonly SmartFarmDbContext _context;
     public MeasurementRecordRepository(SmartFarmDbContext context) => _context = context;
 
-    public async Task<MeasurementRecord?> GetByIdAsync(Guid id) =>
-        await _context.MeasurementRecords
+    private IQueryable<MeasurementRecord> BaseQuery(bool includeDeleted = false)
+    {
+        var query = _context.MeasurementRecords
             .Include(m => m.MeasuredByNavigation)
             .Include(m => m.MeasurementDefinition)
-            .FirstOrDefaultAsync(m => m.Id == id);
+            .AsQueryable();
+        if (!includeDeleted)
+            query = query.Where(m => m.DeletedAt == null);
+        return query;
+    }
 
-    public async Task<List<MeasurementRecord>> GetByBatchIdAsync(Guid batchId) =>
-        await _context.MeasurementRecords
-            .Include(m => m.MeasuredByNavigation)
-            .Include(m => m.MeasurementDefinition)
+    public async Task<MeasurementRecord?> GetByIdAsync(Guid id, bool includeDeleted = false) =>
+        await BaseQuery(includeDeleted).FirstOrDefaultAsync(m => m.Id == id);
+
+    public async Task<List<MeasurementRecord>> GetByBatchIdAsync(Guid batchId, bool includeDeleted = false) =>
+        await BaseQuery(includeDeleted)
             .Where(m => m.BatchId == batchId)
+            .OrderByDescending(m => m.MeasuredAt)
+            .ToListAsync();
+
+    public async Task<List<MeasurementRecord>> GetByExperimentIdAsync(Guid experimentId, bool includeDeleted = false) =>
+        await BaseQuery(includeDeleted)
+            .Where(m => m.ExperimentId == experimentId)
+            .OrderByDescending(m => m.MeasuredAt)
+            .ToListAsync();
+
+    public async Task<List<MeasurementRecord>> GetByStageIdAsync(Guid stageId, bool includeDeleted = false) =>
+        await BaseQuery(includeDeleted)
+            .Where(m => m.ExperimentStageId == stageId)
             .OrderByDescending(m => m.MeasuredAt)
             .ToListAsync();
 
@@ -39,9 +57,13 @@ public class MeasurementRecordRepository : IMeasurementRecordRepository
         await _context.SaveChangesAsync();
     }
 
-    public async Task DeleteAsync(Guid id)
+    public async Task SoftDeleteAsync(Guid id)
     {
-        var e = await _context.MeasurementRecords.FindAsync(id);
-        if (e != null) { _context.MeasurementRecords.Remove(e); await _context.SaveChangesAsync(); }
+        var record = await _context.MeasurementRecords.FindAsync(id);
+        if (record != null)
+        {
+            record.DeletedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+        }
     }
 }

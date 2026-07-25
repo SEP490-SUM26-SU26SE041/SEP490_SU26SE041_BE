@@ -15,6 +15,18 @@ public class CreateTaskDto
     public DateTime? DueDate { get; set; }
 }
 
+public class MyTaskFilterDto
+{
+    /// <summary>Filter theo status — chấp nhận 1 hoặc nhiều giá trị: Pending, InProgress, Completed, Overdue, Cancelled.</summary>
+    public List<string>? Statuses { get; set; }
+
+    /// <summary>Filter theo batch (Guid).</summary>
+    public Guid? BatchId { get; set; }
+
+    /// <summary>Filter theo experiment (Guid).</summary>
+    public Guid? ExperimentId { get; set; }
+}
+
 public class UpdateTaskDto
 {
     public Guid? ExperimentStageId { get; set; }

@@ -11,6 +11,7 @@ public interface ITaskService
     System.Threading.Tasks.Task<System.Collections.Generic.List<TaskResponseDto>> GetByStageAsync(Guid stageId);
     System.Threading.Tasks.Task<System.Collections.Generic.List<TaskResponseDto>> GetByBatchAsync(Guid batchId);
     System.Threading.Tasks.Task<System.Collections.Generic.List<TaskResponseDto>> GetByAssigneeAsync(Guid assigneeId);
+    System.Threading.Tasks.Task<System.Collections.Generic.List<TaskResponseDto>> GetMyTasksAsync(Guid assigneeId, MyTaskFilterDto filter);
     System.Threading.Tasks.Task<System.Collections.Generic.List<TaskResponseDto>> GetAllAsync();
     System.Threading.Tasks.Task<System.Collections.Generic.List<TaskResponseDto>> GetTodayTasksAsync(Guid assigneeId);
     System.Threading.Tasks.Task<System.Collections.Generic.List<TaskResponseDto>> GetUpcomingTasksAsync(Guid assigneeId, int days);

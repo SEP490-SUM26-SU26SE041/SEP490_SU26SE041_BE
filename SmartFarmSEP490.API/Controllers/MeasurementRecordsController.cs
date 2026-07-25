@@ -31,7 +31,7 @@ public class MeasurementRecordsController : ControllerBase
         if (!ModelState.IsValid) return BadRequest(ModelState);
 
         var result = await _recordService.CreateAsync(dto, GetUserId());
-        return result == null ? BadRequest("Failed to create record.") : CreatedAtAction(nameof(GetHistory), new { batchId = dto.BatchId }, result);
+        return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
     }
 
     /// <summary>
@@ -43,25 +43,53 @@ public class MeasurementRecordsController : ControllerBase
         if (!ModelState.IsValid) return BadRequest(ModelState);
 
         var result = await _recordService.UpdateAsync(id, dto, GetUserId());
-        return result == null ? NotFound() : Ok(result);
+        return Ok(result);
     }
 
     /// <summary>
-    /// Delete Measurement Record
+    /// Delete Measurement Record (Soft Delete)
     /// </summary>
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> DeleteRecord(Guid id)
     {
-        var deleted = await _recordService.DeleteAsync(id);
-        return deleted ? NoContent() : NotFound();
+        await _recordService.DeleteAsync(id);
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Get Measurement Record By Id
+    /// </summary>
+    [HttpGet("{id:guid}")]
+    public async Task<IActionResult> GetById(Guid id)
+    {
+        var result = await _recordService.GetByIdAsync(id);
+        return Ok(result);
     }
 
     /// <summary>
     /// Get Measurement History By Batch
     /// </summary>
     [HttpGet("batch/{batchId:guid}")]
-    public async Task<IActionResult> GetHistory(Guid batchId)
+    public async Task<IActionResult> GetByBatch(Guid batchId)
     {
         return Ok(await _recordService.GetByBatchIdAsync(batchId));
+    }
+
+    /// <summary>
+    /// Get Measurement Records By Experiment
+    /// </summary>
+    [HttpGet("experiment/{experimentId:guid}")]
+    public async Task<IActionResult> GetByExperiment(Guid experimentId)
+    {
+        return Ok(await _recordService.GetByExperimentIdAsync(experimentId));
+    }
+
+    /// <summary>
+    /// Get Measurement Records By Stage
+    /// </summary>
+    [HttpGet("stage/{stageId:guid}")]
+    public async Task<IActionResult> GetByStage(Guid stageId)
+    {
+        return Ok(await _recordService.GetByStageIdAsync(stageId));
     }
 }

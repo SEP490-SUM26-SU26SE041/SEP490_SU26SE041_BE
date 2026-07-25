@@ -1,11 +1,15 @@
 using System.Text;
 using System.Text.Json.Serialization;
+using FluentValidation;
+using FluentValidation.AspNetCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Npgsql;
 using Npgsql.NameTranslation;
 using SmartFarmSEP490.Model.Enums;
+using SmartFarmSEP490.Model.Validators;
+using SmartFarmSEP490.API.Middleware;
 using SmartFarmSEP490.Repository.DbContexts;
 using SmartFarmSEP490.Repository.Interfaces.Areas;
 using SmartFarmSEP490.Repository.Interfaces.Auth;
@@ -150,6 +154,12 @@ builder.Services.AddScoped<ITaskReportService, TaskReportService>();
 builder.Services.AddScoped<IMeasurementRecordService, MeasurementRecordService>();
 builder.Services.AddScoped<ITaskImageService, TaskImageService>();
 
+// Overdue sweep (idempotent) — gọi 2 nơi:
+//   1. Lazy ở đầu các TaskService.Get*() để user thấy status = Overdue ngay khi GET
+//   2. Background service chạy đúng 00:00 ICT mỗi ngày (cron tự động)
+builder.Services.AddScoped<IOverdueTaskService, OverdueTaskService>();
+builder.Services.AddHostedService<OverdueTaskSweepBackgroundService>();
+
 var jwtSettings = builder.Configuration.GetSection("Jwt");
 var key = Encoding.UTF8.GetBytes(jwtSettings["Key"]!);
 
@@ -219,6 +229,11 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(options =
 {
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
 });
+builder.Services.AddProblemDetails();
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+builder.Services.AddMemoryCache();
+builder.Services.AddFluentValidationAutoValidation();
+builder.Services.AddValidatorsFromAssemblyContaining<CreateTaskDtoValidator>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddSignalR();
 builder.Services.AddEndpointsApiExplorer();
@@ -277,6 +292,9 @@ try
         }
     });
 
+    app.UseExceptionHandler();
+    app.UseRateLimiting();
+    app.UseIdempotency();
     app.UseAuthentication();
     app.UseAuthorization();
 
