@@ -455,6 +455,9 @@ public class TaskService : ITaskService
         var task = await _taskRepository.GetByIdAsync(id);
         if (task == null) return null;
 
+        if (task.DueDate.HasValue && task.DueDate.Value < DateTime.UtcNow)
+            throw new InvalidOperationException("Task da qua han, khong the cap nhat trang thai.");
+
         task.Status = Enum.TryParse<Model.Enums.TaskStatus>(status, ignoreCase: true, out var ts) ? ts : task.Status;
         task.UpdatedAt = DateTime.UtcNow;
         await _taskRepository.UpdateAsync(task);
