@@ -66,6 +66,12 @@ using SmartFarmSEP490.Repository.Implementations.Notifications;
 using SmartFarmSEP490.Service.Interfaces.Notifications;
 using SmartFarmSEP490.Service.Services.Notifications;
 using SmartFarmSEP490.Service.Hubs;
+using SmartFarmSEP490.Repository.Interfaces.Sensors;
+using SmartFarmSEP490.Repository.Implementations.Sensors;
+using SmartFarmSEP490.Repository.Interfaces.Alerts;
+using SmartFarmSEP490.Repository.Implementations.Alerts;
+using SmartFarmSEP490.Service.Interfaces.Dashboard;
+using SmartFarmSEP490.Service.Services.Dashboard;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -153,6 +159,14 @@ builder.Services.AddScoped<ITaskService, TaskService>();
 builder.Services.AddScoped<ITaskReportService, TaskReportService>();
 builder.Services.AddScoped<IMeasurementRecordService, MeasurementRecordService>();
 builder.Services.AddScoped<ITaskImageService, TaskImageService>();
+
+// Dashboard Services
+builder.Services.AddScoped<ISensorRepository, SensorRepository>();
+builder.Services.AddScoped<IAlertRepository, AlertRepository>();
+builder.Services.AddScoped<IExperimentReportRepository, ExperimentReportRepository>();
+builder.Services.AddScoped<IDashboardService, DashboardService>();
+builder.Services.AddScoped<IComparisonService, ComparisonService>();
+builder.Services.AddScoped<IReportExportService, ReportExportService>();
 
 // Overdue sweep (idempotent) — gọi 2 nơi:
 //   1. Lazy ở đầu các TaskService.Get*() để user thấy status = Overdue ngay khi GET
