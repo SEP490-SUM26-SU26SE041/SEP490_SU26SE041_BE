@@ -31,6 +31,10 @@ public class TaskReportService : ITaskReportService
         var task = await _taskRepository.GetByIdAsync(dto.TaskId);
         if (task == null) return null;
 
+        var existingReports = await _reportRepository.GetByTaskIdAsync(dto.TaskId);
+        if (existingReports.Any())
+            throw new InvalidOperationException("Task nay da co report roi, moi task chi duoc gui 1 report.");
+
         string? resultDataJson = dto.ResultData != null
             ? JsonSerializer.Serialize(dto.ResultData)
             : null;
