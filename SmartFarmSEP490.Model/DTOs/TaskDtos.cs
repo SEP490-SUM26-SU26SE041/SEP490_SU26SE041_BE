@@ -13,6 +13,7 @@ public class CreateTaskDto
     public string? Description { get; set; }
     public string? RequiredSkillDescription { get; set; }
     public DateTime? DueDate { get; set; }
+    public List<TaskSkillRequirementInputDto>? SkillRequirements { get; set; }
 }
 
 public class MyTaskFilterDto
@@ -38,6 +39,7 @@ public class UpdateTaskDto
     public string? RequiredSkillDescription { get; set; }
     public DateTime? DueDate { get; set; }
     public string? Status { get; set; }
+    public List<TaskSkillRequirementInputDto>? SkillRequirements { get; set; }
 }
 
 public class TaskResponseDto
@@ -80,6 +82,12 @@ public class TaskSkillRequirementResponseDto
     public Guid SkillId { get; set; }
     public string SkillName { get; set; } = string.Empty;
     public int RequiredLevel { get; set; }
+}
+
+public class TaskSkillRequirementInputDto
+{
+    public Guid SkillId { get; set; }
+    public int RequiredLevel { get; set; } = 1;
 }
 
 // ============ TaskAssignment DTOs ============

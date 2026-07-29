@@ -71,9 +71,9 @@ public class TaskService : ITaskService
             return null;
 
         // FE gửi DueDate theo giờ Việt Nam → convert sang UTC trước khi lưu
-        var dueDateUtc = dto.DueDate.HasValue
-            ? VietnamTime.ToUtcFromVietnam(dto.DueDate.Value)
-            : (DateTime?)null;
+        //var dueDateUtc = dto.DueDate.HasValue
+        //    ? VietnamTime.ToUtcFromVietnam(dto.DueDate.Value)
+        //    : (DateTime?)null;
 
         var task = new Model.Task
         {
@@ -87,13 +87,28 @@ public class TaskService : ITaskService
             Title = dto.Title,
             Description = dto.Description,
             RequiredSkillDescription = dto.RequiredSkillDescription,
-            DueDate = dueDateUtc,
+            DueDate = dto.DueDate,
             Status = Model.Enums.TaskStatus.Pending,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
 
         await _taskRepository.AddAsync(task);
+
+        if (dto.SkillRequirements != null && dto.SkillRequirements.Any())
+        {
+            foreach (var s in dto.SkillRequirements)
+            {
+                await _skillRequirementRepository.AddAsync(new Model.TaskSkillRequirement
+                {
+                    TaskId = task.Id,
+                    SkillId = s.SkillId,
+                    RequiredLevel = s.RequiredLevel
+                });
+            }
+            task.TaskSkillRequirements = await _skillRequirementRepository.GetByTaskAsync(task.Id);
+        }
+
         return await MapToResponseDto(task);
     }
 
@@ -227,6 +242,22 @@ public class TaskService : ITaskService
         task.UpdatedAt = DateTime.UtcNow;
 
         await _taskRepository.UpdateAsync(task);
+
+        if (dto.SkillRequirements != null)
+        {
+            await _skillRequirementRepository.DeleteByTaskAsync(id);
+            foreach (var s in dto.SkillRequirements)
+            {
+                await _skillRequirementRepository.AddAsync(new Model.TaskSkillRequirement
+                {
+                    TaskId = id,
+                    SkillId = s.SkillId,
+                    RequiredLevel = s.RequiredLevel
+                });
+            }
+            task.TaskSkillRequirements = await _skillRequirementRepository.GetByTaskAsync(id);
+        }
+
         return await MapToResponseDto(task);
     }
 
@@ -652,7 +683,7 @@ public class TaskService : ITaskService
             .Select(tsr => new TaskSkillRequirementResponseDto
             {
                 SkillId = tsr.SkillId,
-                SkillName = tsr.Skill.SkillName,
+                SkillName = tsr.Skill?.SkillName ?? string.Empty,
                 RequiredLevel = tsr.RequiredLevel
             }).ToList();
 

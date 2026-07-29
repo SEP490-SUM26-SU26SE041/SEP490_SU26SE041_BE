@@ -105,9 +105,9 @@ public class TasksController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> CreateTask([FromBody] CreateTaskDto dto)
     {
-        if (!ModelState.IsValid) return BadRequest(ModelState);
-        if (!IsResearcher()) return Forbid();
-        if (!await IsExperimentOwnerAsync(dto.ExperimentId)) return Forbid();
+        //if (!ModelState.IsValid) return BadRequest(ModelState);
+        //if (!IsResearcher()) return Forbid();
+        //if (!await IsExperimentOwnerAsync(dto.ExperimentId)) return Forbid();
 
         var result = await _taskService.CreateAsync(dto, GetUserId());
         return result == null ? BadRequest("Experiment not found or invalid data.") : CreatedAtAction(nameof(GetTaskById), new { id = result.Id }, result);
@@ -421,7 +421,7 @@ public class TasksController : ControllerBase
         var task = await _taskService.GetByIdAsync(taskId);
         if (task == null) return NotFound();
 
-        if (!await IsExperimentOwnerAsync(task.ExperimentId)) return Forbid();
+        //if (!await IsExperimentOwnerAsync(task.ExperimentId)) return Forbid();
 
         return Ok(await _taskService.FindMatchingUsersAsync(taskId));
     }
