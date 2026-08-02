@@ -460,4 +460,9 @@ FodyWeavers.xsd
 appsettings.json
 # appsettings.Development.json
 # appsettings.Production.json
-# appsettings.*.json
+# appsettings.*.
+
+API-TESTING-SPEC.md
+API_TESTING_SPEC.md
+SPEC.md
+delete_block.md

@@ -17,4 +17,6 @@ public interface IExperimentBedAssignmentRepository
     Task UpdateOrCreateAssignmentAsync(Guid requestId, Guid bedId, Guid? experimentId, DateOnly assignedFrom, string? purpose);
     Task ReleaseBedsAsync(Guid experimentId);
     Task<List<Guid>> GetAvailableBedIdsByFarmAsync(Guid farmId);
+    Task UpdateGroupAssignmentAsync(Guid assignmentId, Guid? groupId, int? replicateIndex);
+    Task UpdateRangeAsync(IEnumerable<M.ExperimentBedAssignment> entities);
 }

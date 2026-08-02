@@ -125,7 +125,7 @@ public class ExperimentsController : ControllerBase
             var result = await _experimentService.CreateFromRequestAsync(requestId, GetUserId());
             return result == null
                 ? NotFound(new ApiResponse { Success = false, Message = "Khong the tao thuc nghiem." })
-                : StatusCode(201, ApiResponse<ExperimentResponseDto>.Created(result, "Tao thuc nghiem tu yeu cau thanh cong. Cac lo da duoc chuyen sang trang thai Occupied."));
+                : StatusCode(201, ApiResponse<ExperimentResponseDto>.Created(result, "Tao thuc nghiem tu yeu cau thanh cong. Cac lo da duoc chuyen sang trang thai Assigned."));
         }
         catch (InvalidOperationException ex) { return BadRequest(new ApiResponse { Success = false, Message = ex.Message }); }
         catch (Exception ex) { return StatusCode(500, new ApiResponse { Success = false, Message = ex.Message }); }
@@ -327,6 +327,51 @@ public class ExperimentsController : ControllerBase
         if (group != null && !await CanManageExperimentAsync(group.ExperimentId)) return Forbid();
         await _groupService.DeleteAsync(id);
         return Ok(new ApiResponse { Success = true, Message = "Xoa nhom thanh cong." });
+    }
+
+    // ========== Randomization & Auto-Setup ==========
+
+    [HttpPost("{experimentId:guid}/randomize-beds")]
+    public async Task<IActionResult> RandomizeBeds(Guid experimentId)
+    {
+        if (!await CanAccessExperimentAsync(experimentId)) return Forbid();
+        try
+        {
+            var result = await _experimentService.RandomizeBedsAsync(experimentId);
+            return result == null
+                ? NotFound(new ApiResponse { Success = false, Message = "Khong tim thay thuc nghiem." })
+                : Ok(ApiResponse<RandomizationResultDto>.Ok(result, "Randomize beds thanh cong."));
+        }
+        catch (InvalidOperationException ex) { return BadRequest(new ApiResponse { Success = false, Message = ex.Message }); }
+        catch (Exception ex) { return StatusCode(500, new ApiResponse { Success = false, Message = ex.Message }); }
+    }
+
+    [HttpPut("{experimentId:guid}/groups/supplement")]
+    public async Task<IActionResult> SupplementGroups(Guid experimentId, [FromBody] SupplementGroupsDto dto)
+    {
+        if (!await CanManageExperimentAsync(experimentId)) return Forbid();
+        try
+        {
+            dto.ExperimentId = experimentId;
+            var result = await _experimentService.SupplementGroupsAsync(dto);
+            return Ok(ApiResponse<List<ExperimentGroupResponseDto>>.Ok(result, "Cap nhat/bosung nhom thanh cong."));
+        }
+        catch (InvalidOperationException ex) { return BadRequest(new ApiResponse { Success = false, Message = ex.Message }); }
+        catch (Exception ex) { return StatusCode(500, new ApiResponse { Success = false, Message = ex.Message }); }
+    }
+
+    [HttpPost("{experimentId:guid}/auto-setup")]
+    public async Task<IActionResult> AutoSetup(Guid experimentId)
+    {
+        if (!await CanManageExperimentAsync(experimentId)) return Forbid();
+        try
+        {
+            await _experimentService.AutoSetupExperimentStructureAsync(experimentId);
+            var updated = await _experimentService.GetByIdAsync(experimentId);
+            return Ok(ApiResponse<ExperimentResponseDto>.Ok(updated!, "Tu dong tao cau truc thuc nghiem (Design, Groups, Batches) thanh cong."));
+        }
+        catch (InvalidOperationException ex) { return BadRequest(new ApiResponse { Success = false, Message = ex.Message }); }
+        catch (Exception ex) { return StatusCode(500, new ApiResponse { Success = false, Message = ex.Message }); }
     }
 
     // ========== Experiment Design ==========

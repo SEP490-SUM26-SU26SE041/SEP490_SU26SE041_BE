@@ -22,6 +22,14 @@ public class ExperimentGroupRepository : IExperimentGroupRepository
         await _context.ExperimentGroups.AddAsync(entity); await _context.SaveChangesAsync(); return entity;
     }
 
+    public async Task AddRangeAsync(IEnumerable<M.ExperimentGroup> entities)
+    {
+        var now = DateTime.UtcNow;
+        foreach (var e in entities) e.CreatedAt = now;
+        await _context.ExperimentGroups.AddRangeAsync(entities);
+        await _context.SaveChangesAsync();
+    }
+
     public async Task UpdateAsync(M.ExperimentGroup entity)
     {
         _context.ExperimentGroups.Update(entity); await _context.SaveChangesAsync();

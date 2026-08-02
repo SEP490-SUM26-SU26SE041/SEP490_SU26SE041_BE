@@ -1,6 +1,7 @@
 namespace SmartFarmSEP490.Model.DTOs;
 
 using SmartFarmSEP490.Model.Enums;
+using System.Text.Json.Serialization;
 
 // ============ Experiment DTOs ============
 
@@ -280,4 +281,56 @@ public class CareScheduleResponseDto
 public class UpdateExperimentStatusDto
 {
     public string Status { get; set; } = string.Empty;
+}
+
+// ============ Treatment & Randomization DTOs ============
+
+public class TreatmentDto
+{
+    public string Name { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public GroupType GroupType { get; set; } = GroupType.Treatment;
+}
+
+public class RandomizationResultDto
+{
+    public Guid ExperimentId { get; set; }
+    public DesignType DesignType { get; set; }
+    public int ReplicationCount { get; set; }
+    public int TotalBedsAssigned { get; set; }
+    public int TotalGroups { get; set; }
+    public List<GroupAssignmentDto> Assignments { get; set; } = new();
+}
+
+public class GroupAssignmentDto
+{
+    public Guid GroupId { get; set; }
+    public string GroupName { get; set; } = string.Empty;
+    public int ReplicateIndex { get; set; }
+    public Guid BedId { get; set; }
+    public string? BedCode { get; set; }
+}
+
+public class SupplementGroupsDto
+{
+    public Guid ExperimentId { get; set; }
+    public List<UpdateGroupItemDto> Groups { get; set; } = new();
+}
+
+public class UpdateGroupItemDto
+{
+    public Guid? Id { get; set; }
+    public string GroupName { get; set; } = string.Empty;
+    public string? TreatmentDescription { get; set; }
+    public GroupType GroupType { get; set; } = GroupType.Treatment;
+}
+
+public class MonitoringPlanDto
+{
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public DesignType DesignType { get; set; } = DesignType.Other;
+    public int ReplicationCount { get; set; } = 1;
+    public string? RandomizationMethod { get; set; }
+    public List<TreatmentDto>? Treatments { get; set; }
+    public Dictionary<string, List<string>>? FactorialFactors { get; set; }
 }

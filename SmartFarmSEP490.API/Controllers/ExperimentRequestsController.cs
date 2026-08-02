@@ -199,15 +199,12 @@ public class ExperimentRequestsController : ControllerBase
         if (!string.Equals(existing.Status, "Pending", StringComparison.OrdinalIgnoreCase))
             return BadRequest(new { message = $"Yeu cau da o trang thai '{existing.Status}'. Khong the duyet lai." });
 
-        if (dto.Result == ReviewResult.Approved && (dto.ReservedBedIds == null || dto.ReservedBedIds.Count == 0))
-            return BadRequest(new { message = "Khi duyet yeu cau, can chon it nhat mot lo de giu cho." });
-
         try
         {
             var result = await _service.ReviewAsync(id, dto, userId);
             return result == null
                 ? StatusCode(500, new { message = "Duyet yeu cau that bai." })
-                : Ok(new { success = true, message = "Duyet yeu cau thanh cong.", data = result });
+                : Ok(new { success = true, message = "Duyet yeu cau thanh cong. He thong se tu dong chon beds.", data = result });
         }
         catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
         catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }

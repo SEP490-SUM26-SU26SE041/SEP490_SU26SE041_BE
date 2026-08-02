@@ -76,7 +76,7 @@ public class ExperimentBedAssignmentRepository : IExperimentBedAssignmentReposit
     public async Task AssignBedsToExperimentAsync(Guid requestId, Guid experimentId)
     {
         var assignments = await _context.ExperimentBedAssignments
-            .Where(e => e.RequestId == requestId && e.Status.ToString() == "Reserved").ToListAsync();
+            .Where(e => e.RequestId == requestId && e.Status == AllocationStatus.Reserved).ToListAsync();
         foreach (var a in assignments)
         {
             a.ExperimentId = experimentId;
@@ -104,8 +104,9 @@ public class ExperimentBedAssignmentRepository : IExperimentBedAssignmentReposit
             .Where(b => b.Area.FarmId == farmId && b.DeletedAt == null)
             .Select(b => b.Id).ToListAsync();
 
+        var releasedStatus = AllocationStatus.Released.ToString();
         var occupiedBedIds = await _context.ExperimentBedAssignments
-            .Where(e => farmBedIds.Contains(e.BedId) && e.Status.ToString() != "Released")
+            .Where(e => farmBedIds.Contains(e.BedId) && e.Status.ToString() != releasedStatus)
             .Select(e => e.BedId).Distinct().ToListAsync();
 
         return farmBedIds.Except(occupiedBedIds).ToList();
@@ -139,6 +140,23 @@ public class ExperimentBedAssignmentRepository : IExperimentBedAssignmentReposit
             };
             await _context.ExperimentBedAssignments.AddAsync(entity);
         }
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task UpdateGroupAssignmentAsync(Guid assignmentId, Guid? groupId, int? replicateIndex)
+    {
+        var assignment = await _context.ExperimentBedAssignments.FindAsync(assignmentId);
+        if (assignment != null)
+        {
+            assignment.GroupId = groupId;
+            assignment.ReplicateIndex = replicateIndex;
+            await _context.SaveChangesAsync();
+        }
+    }
+
+    public async Task UpdateRangeAsync(IEnumerable<M.ExperimentBedAssignment> entities)
+    {
+        _context.ExperimentBedAssignments.UpdateRange(entities);
         await _context.SaveChangesAsync();
     }
 }
