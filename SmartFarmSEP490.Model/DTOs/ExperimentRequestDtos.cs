@@ -31,9 +31,6 @@ public class ReviewExperimentRequestDto
 {
     public ReviewResult Result { get; set; } = ReviewResult.Approved;
     public string? Comment { get; set; }
-    public List<Guid>? ReservedBedIds { get; set; }
-    public int? ReplicationCount { get; set; }
-    public int? ExpectedGroups { get; set; }
 }
 
 public class ExperimentRequestResponseDto

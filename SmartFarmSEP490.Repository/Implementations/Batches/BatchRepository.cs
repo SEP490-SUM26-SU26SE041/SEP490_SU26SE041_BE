@@ -33,6 +33,14 @@ public class BatchRepository : IBatchRepository
         await _context.Batches.AddAsync(entity); await _context.SaveChangesAsync(); return entity;
     }
 
+    public async Task AddRangeAsync(IEnumerable<M.Batch> entities)
+    {
+        var now = DateTime.UtcNow;
+        foreach (var e in entities) e.CreatedAt = now;
+        await _context.Batches.AddRangeAsync(entities);
+        await _context.SaveChangesAsync();
+    }
+
     public async Task UpdateAsync(M.Batch entity)
     {
         _context.Batches.Update(entity); await _context.SaveChangesAsync();

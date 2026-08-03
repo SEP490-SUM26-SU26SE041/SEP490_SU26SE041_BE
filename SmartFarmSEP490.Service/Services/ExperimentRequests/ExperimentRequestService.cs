@@ -8,6 +8,7 @@ using SmartFarmSEP490.Repository.Interfaces.ExperimentBedAssignments;
 using SmartFarmSEP490.Repository.Interfaces.ExperimentRequests;
 using SmartFarmSEP490.Repository.Interfaces.Farms;
 using SmartFarmSEP490.Service.Interfaces.ExperimentRequests;
+using SmartFarmSEP490.Service.Services.Helpers;
 
 namespace SmartFarmSEP490.Service.Services.ExperimentRequests;
 
@@ -203,26 +204,9 @@ public class ExperimentRequestService : IExperimentRequestService
                 request.Status = newRequestStatus;
                 await _requestRepository.UpdateAsync(request);
 
-                if (dto.Result == ReviewResult.Approved && dto.ReservedBedIds?.Count > 0)
+                if (dto.Result == ReviewResult.Approved)
                 {
-                    var farmBedIds = await _bedAssignmentRepository.GetAvailableBedIdsByFarmAsync(request.FarmId);
-                    var unavailable = dto.ReservedBedIds.Where(id => !farmBedIds.Contains(id)).ToList();
-                    if (unavailable.Count > 0)
-                        throw new InvalidOperationException($"Mot so lo khong con trong: {string.Join(", ", unavailable)}");
-
-                    int requiredBeds = (dto.ReplicationCount ?? 1) * (dto.ExpectedGroups ?? 1);
-                    if (dto.ReservedBedIds.Count < requiredBeds)
-                        throw new InvalidOperationException($"So luong lo duoc chon ({dto.ReservedBedIds.Count}) khong du. Can it nhat {requiredBeds} lo (ReplicationCount={dto.ReplicationCount ?? 1} x Groups={dto.ExpectedGroups ?? 1}).");
-
-                    var reservations = dto.ReservedBedIds.Select(bedId => new M.ExperimentBedAssignment
-                    {
-                        RequestId = requestId,
-                        ExperimentId = null,
-                        BedId = bedId,
-                        Status = AllocationStatus.Reserved,
-                        AssignedFrom = request.ExpectedStartDate ?? DateOnly.FromDateTime(DateTime.UtcNow)
-                    }).ToList();
-                    await _bedAssignmentRepository.CreateRangeAsync(reservations);
+                    await AutoReserveAndRandomizeAsync(requestId, request);
                 }
             }
 
@@ -237,6 +221,85 @@ public class ExperimentRequestService : IExperimentRequestService
             var pg = ex.InnerException as Npgsql.PostgresException;
             _logger.LogError(ex, "Review experiment request failed. SqlState={SqlState} Detail={Detail}", pg?.SqlState, pg?.Detail);
             throw;
+        }
+    }
+
+    private async Task AutoReserveAndRandomizeAsync(Guid requestId, M.ExperimentRequest request)
+    {
+        _logger.LogInformation($"[DEBUG] AutoReserveAndRandomizeAsync START - requestId={requestId}, MonitoringPlan={request.MonitoringPlan}");
+
+        var monitoringPlan = ParseMonitoringPlan(request.MonitoringPlan);
+        if (monitoringPlan == null)
+        {
+            _logger.LogWarning($"[DEBUG] ParseMonitoringPlan returned NULL. Raw JSON: {request.MonitoringPlan}");
+        }
+        else
+        {
+            _logger.LogInformation($"[DEBUG] ParseMonitoringPlan SUCCESS - DesignType={monitoringPlan.DesignType}, ReplicationCount={monitoringPlan.ReplicationCount}, Treatments count={monitoringPlan.Treatments?.Count ?? 0}");
+        }
+
+        var designType = monitoringPlan?.DesignType ?? Model.Enums.DesignType.Other;
+        var replicationCount = monitoringPlan?.ReplicationCount ?? 1;
+
+        List<string>? treatmentNames = null;
+        if (monitoringPlan?.Treatments != null && monitoringPlan.Treatments.Count > 0)
+        {
+            treatmentNames = monitoringPlan.Treatments.Select(t => t.Name).ToList();
+        }
+        else if (monitoringPlan?.FactorialFactors != null && monitoringPlan.FactorialFactors.Count > 0)
+        {
+            treatmentNames = RandomizationHelper.GenerateFactorialGroupNames(monitoringPlan.FactorialFactors);
+        }
+        else
+        {
+            treatmentNames = RandomizationHelper.GenerateDefaultTreatments(2);
+        }
+
+        int expectedGroups = treatmentNames.Count;
+        int requiredBeds = replicationCount * expectedGroups;
+
+        _logger.LogInformation($"[DEBUG] expectedGroups={expectedGroups}, replicationCount={replicationCount}, requiredBeds={requiredBeds}");
+
+        var availableBedIds = await _bedAssignmentRepository.GetAvailableBedIdsByFarmAsync(request.FarmId);
+        _logger.LogInformation($"[DEBUG] availableBedIds count={availableBedIds.Count}");
+
+        if (availableBedIds.Count < requiredBeds)
+            throw new InvalidOperationException($"Khong du beds. Can {requiredBeds} lo, chi co {availableBedIds.Count} lo kha dung.");
+
+        var selectedBedIds = RandomizationHelper.Shuffle(availableBedIds).Take(requiredBeds).ToList();
+        _logger.LogInformation($"[DEBUG] selectedBedIds count={selectedBedIds.Count}, expected={requiredBeds}");
+
+        var reservations = selectedBedIds.Select(bedId => new M.ExperimentBedAssignment
+        {
+            RequestId = requestId,
+            ExperimentId = null,
+            BedId = bedId,
+            Status = AllocationStatus.Reserved,
+            AssignedFrom = request.ExpectedStartDate ?? DateOnly.FromDateTime(DateTime.UtcNow)
+        }).ToList();
+
+        await _bedAssignmentRepository.CreateRangeAsync(reservations);
+        _logger.LogInformation($"[DEBUG] AutoReserveAndRandomizeAsync END - created {reservations.Count} reservations");
+    }
+
+    private static readonly System.Text.Json.JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() }
+    };
+
+    private MonitoringPlanDto? ParseMonitoringPlan(string? monitoringPlanJson)
+    {
+        if (string.IsNullOrWhiteSpace(monitoringPlanJson))
+            return null;
+
+        try
+        {
+            return System.Text.Json.JsonSerializer.Deserialize<MonitoringPlanDto>(monitoringPlanJson, JsonOptions);
+        }
+        catch
+        {
+            return null;
         }
     }
 
@@ -279,6 +342,20 @@ public class ExperimentRequestService : IExperimentRequestService
             var request = await _requestRepository.GetByIdAsync(requestId);
             if (request == null) return null;
 
+            var monitoringPlan = ParseMonitoringPlan(request.MonitoringPlan);
+            var actualReplicationCount = replicationCount ?? monitoringPlan?.ReplicationCount ?? 1;
+
+            List<string>? treatmentNames = null;
+            if (monitoringPlan?.Treatments != null && monitoringPlan.Treatments.Count > 0)
+            {
+                treatmentNames = monitoringPlan.Treatments.Select(t => t.Name).ToList();
+            }
+            else if (monitoringPlan?.FactorialFactors != null && monitoringPlan.FactorialFactors.Count > 0)
+            {
+                treatmentNames = RandomizationHelper.GenerateFactorialGroupNames(monitoringPlan.FactorialFactors);
+            }
+            int actualExpectedGroups = expectedGroups ?? treatmentNames?.Count ?? 2;
+
             var resources = await _farmRepository.GetFarmResourceSummaryAsync(request.FarmId);
             if (resources == null) return null;
 
@@ -299,13 +376,13 @@ public class ExperimentRequestService : IExperimentRequestService
                 UpdatedAt = b.UpdatedAt
             }).ToList();
 
-            int requiredBeds = (replicationCount ?? 1) * (expectedGroups ?? 1);
+            int requiredBeds = actualReplicationCount * actualExpectedGroups;
             bool sufficientBeds = availableBedDtos.Count >= requiredBeds;
             bool isValid = sufficientBeds;
 
             string? message;
             if (!sufficientBeds)
-                message = $"Farm '{resources.FarmName}' khong du beds. Can {requiredBeds} lo (ReplicationCount={replicationCount ?? 1} x Groups={expectedGroups ?? 1}), chi co {availableBedDtos.Count} lo kha dung.";
+                message = $"Farm '{resources.FarmName}' khong du beds. Can {requiredBeds} lo (ReplicationCount={actualReplicationCount} x Groups={actualExpectedGroups}), chi co {availableBedDtos.Count} lo kha dung.";
             else
                 message = $"Farm '{resources.FarmName}' co {availableBedDtos.Count}/{resources.TotalBeds} beds kha dung. Can {requiredBeds} lo cho thuc nghiem.";
 

@@ -64,6 +64,13 @@ public class ExperimentRepository : IExperimentRepository
         return entity;
     }
 
+    public async Task<M.ExperimentDesign> CreateDesignAsync(M.ExperimentDesign entity)
+    {
+        await _context.ExperimentDesigns.AddAsync(entity);
+        await _context.SaveChangesAsync();
+        return entity;
+    }
+
     public async Task UpdateAsync(M.Experiment entity)
     {
         entity.UpdatedAt = DateTime.UtcNow;

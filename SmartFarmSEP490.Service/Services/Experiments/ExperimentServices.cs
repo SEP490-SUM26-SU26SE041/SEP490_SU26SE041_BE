@@ -2,6 +2,8 @@ using M = SmartFarmSEP490.Model;
 using Microsoft.EntityFrameworkCore;
 using SmartFarmSEP490.Model.DTOs;
 using SmartFarmSEP490.Model.Enums;
+using SmartFarmSEP490.Repository.DbContexts;
+using SmartFarmSEP490.Repository.Interfaces.Batches;
 using SmartFarmSEP490.Repository.Interfaces.Beds;
 using SmartFarmSEP490.Repository.Interfaces.CareSchedules;
 using SmartFarmSEP490.Repository.Interfaces.ExperimentBedAssignments;
@@ -13,6 +15,7 @@ using SmartFarmSEP490.Repository.Interfaces.Experiments;
 using SmartFarmSEP490.Repository.Interfaces.MeasurementDefinitions;
 using SmartFarmSEP490.Repository.Interfaces.ProcedureTemplates;
 using SmartFarmSEP490.Service.Interfaces.Experiments;
+using SmartFarmSEP490.Service.Services.Helpers;
 
 namespace SmartFarmSEP490.Service.Services.Experiments;
 
@@ -23,19 +26,28 @@ public class ExperimentService : IExperimentService
     private readonly IExperimentRequestRepository _requestRepository;
     private readonly IExperimentBedAssignmentRepository _bedAssignmentRepository;
     private readonly IBedRepository _bedRepository;
+    private readonly IExperimentGroupRepository _groupRepository;
+    private readonly IBatchRepository _batchRepository;
+    private readonly SmartFarmDbContext _context;
 
     public ExperimentService(
         IExperimentRepository experimentRepository,
         IProcedureTemplateRepository templateRepository,
         IExperimentRequestRepository requestRepository,
         IExperimentBedAssignmentRepository bedAssignmentRepository,
-        IBedRepository bedRepository)
+        IBedRepository bedRepository,
+        IExperimentGroupRepository groupRepository,
+        IBatchRepository batchRepository,
+        SmartFarmDbContext context)
     {
         _experimentRepository = experimentRepository;
         _templateRepository = templateRepository;
         _requestRepository = requestRepository;
         _bedAssignmentRepository = bedAssignmentRepository;
         _bedRepository = bedRepository;
+        _groupRepository = groupRepository;
+        _batchRepository = batchRepository;
+        _context = context;
     }
 
     public async Task<ExperimentResponseDto?> CreateAsync(CreateExperimentDto dto, Guid researcherId)
@@ -58,7 +70,9 @@ public class ExperimentService : IExperimentService
                 ResearcherId = researcherId,
                 CropVarietyId = dto.CropVarietyId,
                 ProcedureTemplateId = dto.ProcedureTemplateId,
-                ExperimentCode = dto.ExperimentCode,
+                ExperimentCode = string.IsNullOrWhiteSpace(dto.ExperimentCode)
+                    ? $"EXP-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString()[..8].ToUpper()}"
+                    : dto.ExperimentCode,
                 Title = dto.Title,
                 Objective = dto.Objective,
                 Hypothesis = dto.Hypothesis,
@@ -67,6 +81,7 @@ public class ExperimentService : IExperimentService
                 Status = ExperimentStatus.Active
             };
 
+            Guid createdId;
             if (dto.ProcedureTemplateId.HasValue)
             {
                 var template = await _templateRepository.GetByIdWithStepsAsync(dto.ProcedureTemplateId.Value);
@@ -85,14 +100,34 @@ public class ExperimentService : IExperimentService
                     var result = await _experimentRepository.CreateWithStagesAsync(entity, stages);
                     if (dto.RequestId.HasValue)
                         await _bedAssignmentRepository.AssignBedsToExperimentAsync(dto.RequestId.Value, result.Id);
-                    return await GetByIdAsync(result.Id);
+                    createdId = result.Id;
+                }
+                else
+                {
+                    var resultOnly = await _experimentRepository.CreateAsync(entity);
+                    if (dto.RequestId.HasValue)
+                        await _bedAssignmentRepository.AssignBedsToExperimentAsync(dto.RequestId.Value, resultOnly.Id);
+                    createdId = resultOnly.Id;
                 }
             }
+            else
+            {
+                var resultOnly = await _experimentRepository.CreateAsync(entity);
+                if (dto.RequestId.HasValue)
+                    await _bedAssignmentRepository.AssignBedsToExperimentAsync(dto.RequestId.Value, resultOnly.Id);
+                createdId = resultOnly.Id;
+            }
 
-            var resultOnly = await _experimentRepository.CreateAsync(entity);
-            if (dto.RequestId.HasValue)
-                await _bedAssignmentRepository.AssignBedsToExperimentAsync(dto.RequestId.Value, resultOnly.Id);
-            return await GetByIdAsync(resultOnly.Id);
+            try
+            {
+                await AutoSetupExperimentStructureAsync(createdId);
+            }
+            catch
+            {
+                // Auto-setup that bai thi van giu experiment, nguoi dung co the goi thu cong
+            }
+
+            return await GetByIdAsync(createdId);
         }
         catch (InvalidOperationException) { throw; }
         catch (Exception ex) { throw new Exception($"Tao thuc nghiem that bai: {ex.InnerException?.Message ?? ex.Message}", ex); }
@@ -100,6 +135,7 @@ public class ExperimentService : IExperimentService
 
     public async Task<ExperimentResponseDto?> CreateFromRequestAsync(Guid requestId, Guid researcherId)
     {
+        await using var tx = await _context.Database.BeginTransactionAsync();
         try
         {
             var request = await _requestRepository.GetByIdAsync(requestId);
@@ -115,35 +151,39 @@ public class ExperimentService : IExperimentService
                 ResearcherId = researcherId,
                 CropVarietyId = request.CropVarietyId,
                 ProcedureTemplateId = request.ProcedureTemplateId,
+                ExperimentCode = $"EXP-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString()[..8].ToUpper()}",
                 Title = request.Title,
                 Objective = request.Objective,
                 Status = ExperimentStatus.Active
             };
 
+            List<M.ExperimentStage>? stages = null;
             if (request.ProcedureTemplateId.HasValue)
             {
                 var template = await _templateRepository.GetByIdWithStepsAsync(request.ProcedureTemplateId.Value);
                 if (template != null && template.ProcedureTemplateSteps?.Count > 0)
                 {
-                    var stages = template.ProcedureTemplateSteps
+                    stages = template.ProcedureTemplateSteps
                         .OrderBy(s => s.StepOrder)
                         .Select(s => new M.ExperimentStage
                         {
-                            StageOrder = s.StepOrder, StageName = s.Title,
-                            StageType = s.StageType, Objective = s.Instruction
+                            StageOrder = s.StepOrder,
+                            StageName = s.Title,
+                            StageType = s.StageType,
+                            Objective = s.Instruction
                         }).ToList();
-                    var created = await _experimentRepository.CreateWithStagesAsync(entity, stages);
-                    await _bedAssignmentRepository.AssignBedsToExperimentAsync(requestId, created.Id);
-                    return await GetByIdAsync(created.Id);
                 }
             }
 
-            var resultOnly = await _experimentRepository.CreateAsync(entity);
-            await _bedAssignmentRepository.AssignBedsToExperimentAsync(requestId, resultOnly.Id);
-            return await GetByIdAsync(resultOnly.Id);
+            var created = await _experimentRepository.CreateWithStagesAsync(entity, stages ?? new List<M.ExperimentStage>());
+            await _bedAssignmentRepository.AssignBedsToExperimentAsync(requestId, created.Id);
+            await AutoSetupExperimentStructureAsync(created.Id);
+
+            await tx.CommitAsync();
+            return await GetByIdAsync(created.Id);
         }
-        catch (InvalidOperationException) { throw; }
-        catch (Exception ex) { throw new Exception($"Tao thuc nghiem tu yeu cau that bai: {ex.InnerException?.Message ?? ex.Message}", ex); }
+        catch (InvalidOperationException) { await tx.RollbackAsync(); throw; }
+        catch (Exception ex) { await tx.RollbackAsync(); throw new Exception($"Tao thuc nghiem tu yeu cau that bai: {ex.InnerException?.Message ?? ex.Message}", ex); }
     }
 
     public async Task<ExperimentResponseDto?> UpdateAsync(Guid id, UpdateExperimentDto dto, Guid researcherId)
@@ -237,6 +277,239 @@ public class ExperimentService : IExperimentService
         }
         catch (InvalidOperationException) { throw; }
         catch (Exception ex) { throw new Exception($"Xoa thuc nghiem that bai: {ex.InnerException?.Message ?? ex.Message}", ex); }
+    }
+
+    public async Task AutoSetupExperimentStructureAsync(Guid experimentId)
+    {
+        var experiment = await _experimentRepository.GetByIdAsync(experimentId);
+        if (experiment == null)
+            throw new InvalidOperationException($"Khong tim thay thuc nghiem voi ID: {experimentId}");
+
+        var request = experiment.RequestId.HasValue
+            ? await _requestRepository.GetByIdAsync(experiment.RequestId.Value)
+            : null;
+
+        MonitoringPlanDto? monitoringPlan = null;
+        if (request?.MonitoringPlan != null)
+        {
+            try
+            {
+                monitoringPlan = System.Text.Json.JsonSerializer.Deserialize<MonitoringPlanDto>(
+                    request.MonitoringPlan,
+                    new System.Text.Json.JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true,
+                        Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() }
+                    });
+            }
+            catch { }
+        }
+
+        var designType = monitoringPlan?.DesignType ?? DesignType.Other;
+        var replicationCount = monitoringPlan?.ReplicationCount ?? 1;
+
+        List<string>? treatmentNames = null;
+        if (monitoringPlan?.Treatments != null && monitoringPlan.Treatments.Count > 0)
+        {
+            treatmentNames = monitoringPlan.Treatments.Select(t => t.Name).ToList();
+        }
+        else if (monitoringPlan?.FactorialFactors != null && monitoringPlan.FactorialFactors.Count > 0)
+        {
+            treatmentNames = RandomizationHelper.GenerateFactorialGroupNames(monitoringPlan.FactorialFactors);
+        }
+        else
+        {
+            treatmentNames = RandomizationHelper.GenerateDefaultTreatments(2);
+        }
+
+        var designParams = new Dictionary<string, object>
+        {
+            ["treatments"] = treatmentNames,
+            ["designType"] = designType.ToString(),
+            ["replicationCount"] = replicationCount
+        };
+        if (monitoringPlan?.RandomizationMethod != null)
+            designParams["randomizationMethod"] = monitoringPlan.RandomizationMethod;
+
+        // 1. Tao Design
+        var designEntity = new M.ExperimentDesign
+        {
+            ExperimentId = experimentId,
+            DesignType = designType,
+            ReplicationCount = replicationCount,
+            RandomizationMethod = monitoringPlan?.RandomizationMethod,
+            DesignParameters = System.Text.Json.JsonSerializer.Serialize(designParams)
+        };
+        await _experimentRepository.CreateDesignAsync(designEntity);
+
+        // 2. Lay danh sach beds da assign cho experiment (can cho viec phan nhom)
+        var assignments = await _bedAssignmentRepository.GetByExperimentAsync(experimentId);
+        if (assignments.Count == 0)
+            throw new InvalidOperationException("Khong co beds nao duoc gan cho thuc nghiem. Vui long dam bao beds da duoc 'Assigned' truoc khi auto-setup.");
+
+        // 3. Tao Groups bang AddRange (chi 1 SaveChanges)
+        var groupsToCreate = treatmentNames.Select(treatmentName =>
+        {
+            var groupType = treatmentName.Equals("Control", StringComparison.OrdinalIgnoreCase)
+                ? GroupType.Control
+                : GroupType.Treatment;
+            return new M.ExperimentGroup
+            {
+                ExperimentId = experimentId,
+                GroupName = treatmentName,
+                TreatmentDescription = $"Thu nghiem: {treatmentName}",
+                GroupType = groupType
+            };
+        }).ToList();
+        await _groupRepository.AddRangeAsync(groupsToCreate);
+
+        // 4. Lay Groups da tao (co Id sau khi SaveChanges)
+        var createdGroups = await _groupRepository.GetByExperimentAsync(experimentId);
+
+        // 5. Randomized assignments va cap nhat Group + Replicate
+        var shuffledAssignments = RandomizationHelper.Shuffle(assignments);
+        var groupIndex = 0;
+        var replicateIndex = 1;
+        var bedsPerGroup = assignments.Count / treatmentNames.Count;
+
+        var batchesToCreate = new List<M.Batch>();
+        var assignmentsToUpdate = new List<M.ExperimentBedAssignment>();
+
+        for (int i = 0; i < shuffledAssignments.Count; i++)
+        {
+            var assignment = shuffledAssignments[i];
+            assignment.GroupId = createdGroups[groupIndex].Id;
+            assignment.ReplicateIndex = replicateIndex;
+            assignmentsToUpdate.Add(assignment);
+
+            if ((i + 1) % bedsPerGroup == 0 && groupIndex < createdGroups.Count - 1)
+            {
+                groupIndex++;
+                replicateIndex = 1;
+            }
+            else
+            {
+                replicateIndex++;
+            }
+
+            batchesToCreate.Add(new M.Batch
+            {
+                ExperimentId = experimentId,
+                ExperimentBedAssignmentId = assignment.Id,
+                GroupId = assignment.GroupId,
+                BatchCode = $"Batch-{assignment.Bed?.BedCode ?? assignment.BedId.ToString()[..8]}-{assignment.ReplicateIndex}",
+                CropVarietyId = experiment.CropVarietyId
+            });
+        }
+
+        // 6. Update assignments va tao batches (2 SaveChanges)
+        await _bedAssignmentRepository.UpdateRangeAsync(assignmentsToUpdate);
+        await _batchRepository.AddRangeAsync(batchesToCreate);
+    }
+
+    public async Task<RandomizationResultDto?> RandomizeBedsAsync(Guid experimentId)
+    {
+        var experiment = await _experimentRepository.GetByIdAsync(experimentId);
+        if (experiment == null)
+            throw new InvalidOperationException($"Khong tim thay thuc nghiem voi ID: {experimentId}");
+
+        var assignments = await _bedAssignmentRepository.GetByExperimentAsync(experimentId);
+        if (assignments.Count == 0)
+            throw new InvalidOperationException("Khong co beds nao duoc gan cho thuc nghiem.");
+
+        var groups = await _groupRepository.GetByExperimentAsync(experimentId);
+        if (groups.Count < 2)
+            throw new InvalidOperationException("Can it nhat 2 nhom de thuc hien randomization.");
+
+        var design = experiment.ExperimentDesign;
+        var replicationCount = design?.ReplicationCount ?? 1;
+
+        var shuffledAssignments = RandomizationHelper.Shuffle(assignments);
+        var bedsPerGroup = assignments.Count / groups.Count;
+        var result = new RandomizationResultDto
+        {
+            ExperimentId = experimentId,
+            DesignType = design?.DesignType ?? DesignType.Other,
+            ReplicationCount = replicationCount,
+            TotalBedsAssigned = assignments.Count,
+            TotalGroups = groups.Count,
+            Assignments = new List<GroupAssignmentDto>()
+        };
+
+        int groupIndex = 0;
+        int replicateIndex = 1;
+
+        foreach (var assignment in shuffledAssignments)
+        {
+            var group = groups[groupIndex];
+            assignment.GroupId = group.Id;
+            assignment.ReplicateIndex = replicateIndex;
+            await _bedAssignmentRepository.UpdateGroupAssignmentAsync(assignment.Id, group.Id, replicateIndex);
+
+            result.Assignments.Add(new GroupAssignmentDto
+            {
+                GroupId = group.Id,
+                GroupName = group.GroupName,
+                ReplicateIndex = replicateIndex,
+                BedId = assignment.BedId,
+                BedCode = assignment.Bed?.BedCode
+            });
+
+            if ((result.Assignments.Count) % bedsPerGroup == 0 && groupIndex < groups.Count - 1)
+            {
+                groupIndex++;
+                replicateIndex = 1;
+            }
+            else
+            {
+                replicateIndex++;
+            }
+        }
+
+        return result;
+    }
+
+    public async Task<List<ExperimentGroupResponseDto>> SupplementGroupsAsync(SupplementGroupsDto dto)
+    {
+        var experiment = await _experimentRepository.GetByIdAsync(dto.ExperimentId);
+        if (experiment == null)
+            throw new InvalidOperationException($"Khong tim thay thuc nghiem voi ID: {dto.ExperimentId}");
+
+        var result = new List<ExperimentGroupResponseDto>();
+
+        foreach (var item in dto.Groups)
+        {
+            M.ExperimentGroup group;
+            if (item.Id.HasValue && item.Id.Value != Guid.Empty)
+            {
+                group = (await _groupRepository.GetByIdAsync(item.Id.Value))!;
+                group.GroupName = item.GroupName;
+                group.TreatmentDescription = item.TreatmentDescription;
+                group.GroupType = item.GroupType;
+                await _groupRepository.UpdateAsync(group);
+            }
+            else
+            {
+                group = new M.ExperimentGroup
+                {
+                    ExperimentId = dto.ExperimentId,
+                    GroupName = item.GroupName,
+                    TreatmentDescription = item.TreatmentDescription,
+                    GroupType = item.GroupType
+                };
+                group = await _groupRepository.CreateAsync(group);
+            }
+            result.Add(new ExperimentGroupResponseDto
+            {
+                Id = group.Id,
+                GroupName = group.GroupName,
+                TreatmentDescription = group.TreatmentDescription,
+                GroupType = group.GroupType.ToString(),
+                CreatedAt = group.CreatedAt
+            });
+        }
+
+        return result;
     }
 
     private static ExperimentResponseDto MapToResponseDto(M.Experiment entity)

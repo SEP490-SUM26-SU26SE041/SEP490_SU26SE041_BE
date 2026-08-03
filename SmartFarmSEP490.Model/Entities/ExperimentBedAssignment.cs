@@ -14,6 +14,10 @@ public partial class ExperimentBedAssignment
 
     public Guid BedId { get; set; }
 
+    public Guid? GroupId { get; set; }
+
+    public int? ReplicateIndex { get; set; }
+
     public AllocationStatus Status { get; set; } = AllocationStatus.Reserved;
 
     public DateOnly AssignedFrom { get; set; }
@@ -25,6 +29,8 @@ public partial class ExperimentBedAssignment
     public virtual ICollection<Batch> Batches { get; set; } = new List<Batch>();
 
     public virtual Bed Bed { get; set; } = null!;
+
+    public virtual ExperimentGroup? Group { get; set; }
 
     public virtual Experiment? Experiment { get; set; }
 

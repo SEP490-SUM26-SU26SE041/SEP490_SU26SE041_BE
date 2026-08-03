@@ -8,6 +8,7 @@ public interface IBatchRepository
     Task<List<M.Batch>> GetByExperimentAsync(Guid experimentId);
     Task<M.Batch?> GetByCodeAsync(string code);
     Task<M.Batch> CreateAsync(M.Batch entity);
+    Task AddRangeAsync(IEnumerable<M.Batch> entities);
     Task UpdateAsync(M.Batch entity);
     Task DeleteAsync(Guid id);
 }

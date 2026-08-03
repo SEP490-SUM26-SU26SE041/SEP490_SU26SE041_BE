@@ -13,6 +13,9 @@ public interface IExperimentService
     Task<List<ExperimentResponseDto>> GetByResearcherAsync(Guid researcherId);
     Task<List<ExperimentResponseDto>> GetByFarmAsync(Guid farmId);
     Task<bool> DeleteAsync(Guid id);
+    Task<RandomizationResultDto?> RandomizeBedsAsync(Guid experimentId);
+    Task<List<ExperimentGroupResponseDto>> SupplementGroupsAsync(SupplementGroupsDto dto);
+    Task AutoSetupExperimentStructureAsync(Guid experimentId);
 }
 
 public interface IExperimentStageService
