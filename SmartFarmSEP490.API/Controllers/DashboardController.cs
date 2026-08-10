@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using SmartFarmSEP490.API.Helpers;
 using SmartFarmSEP490.Model.DTOs;
 using SmartFarmSEP490.Service.Interfaces.Dashboard;
 
@@ -202,6 +203,46 @@ public class DashboardController : ControllerBase
     {
         var comparisons = await _comparisonService.GetAllComparisonsAsync(farmId);
         return Ok(comparisons);
+    }
+
+    /// <summary>
+    /// So sánh chỉ số tăng trưởng trung bình giữa 2 nhóm theo từng giai đoạn
+    /// (có thể là theo chiều cao, số lá, hoặc tất cả metric).
+    /// Input: experimentId (route), groupAId & groupBId (query), metricName (query, optional).
+    /// </summary>
+    [HttpGet("experiments/{experimentId:guid}/group-comparison")]
+    // [Authorize(Roles = "Researcher,Manager")]
+    public async Task<IActionResult> GetGroupGrowthComparison(
+        Guid experimentId,
+        [FromQuery] Guid groupAId,
+        [FromQuery] Guid groupBId,
+        [FromQuery] string? metricName = null)
+    {
+        if (groupAId == Guid.Empty || groupBId == Guid.Empty)
+            return BadRequest(ApiResponse.Error("groupAId và groupBId là bắt buộc."));
+        if (groupAId == groupBId)
+            return BadRequest(ApiResponse.Error("groupAId và groupBId phải khác nhau."));
+
+        try
+        {
+            var result = await _comparisonService.GetGroupGrowthComparisonAsync(
+                experimentId, groupAId, groupBId, metricName);
+            return result == null
+                ? NotFound(ApiResponse.Error("Không tìm thấy thực nghiệm."))
+                : Ok(ApiResponse<GroupGrowthComparisonDto>.Ok(result, "So sánh chỉ số tăng trưởng giữa 2 nhóm theo giai đoạn."));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ApiResponse.Error(ex.Message));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ApiResponse.Error(ex.Message));
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, ApiResponse.Error(ex.Message));
+        }
     }
 
     // ========== T27: Report Export ==========

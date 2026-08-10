@@ -341,3 +341,80 @@ public class ExportReportResultDto
     public long FileSizeBytes { get; set; }
     public string Status { get; set; } = "Success";
 }
+
+// ============ Group-vs-Group Growth Comparison (per stage) DTOs ============
+
+/// <summary>
+/// So sánh chỉ số tăng trưởng trung bình giữa 2 nhóm theo từng giai đoạn
+/// (per stage, có thể là theo chiều cao, số lá, hoặc tất cả metric).
+/// </summary>
+public class GroupGrowthComparisonDto
+{
+    public Guid ExperimentId { get; set; }
+    public string ExperimentCode { get; set; } = string.Empty;
+    public string Title { get; set; } = string.Empty;
+    public DateTime GeneratedAt { get; set; } = DateTime.UtcNow;
+
+    public GroupComparisonSideDto GroupA { get; set; } = new();
+    public GroupComparisonSideDto GroupB { get; set; } = new();
+
+    /// <summary>
+    /// Danh sách giai đoạn của thực nghiệm, mỗi giai đoạn có trung bình chỉ số tăng trưởng của 2 nhóm.
+    /// </summary>
+    public List<StageGrowthComparisonDto> StageComparisons { get; set; } = new();
+}
+
+/// <summary>
+/// Thông tin một nhóm (phía A hoặc phía B) trong phép so sánh.
+/// </summary>
+public class GroupComparisonSideDto
+{
+    public Guid GroupId { get; set; }
+    public string GroupName { get; set; } = string.Empty;
+    public string GroupType { get; set; } = string.Empty;
+    public string? TreatmentDescription { get; set; }
+    public int TotalBatches { get; set; }
+    public int TotalMeasurementRecords { get; set; }
+}
+
+/// <summary>
+/// So sánh một giai đoạn giữa 2 nhóm (cho một metric - ví dụ chiều cao hoặc số lá).
+/// </summary>
+public class StageGrowthComparisonDto
+{
+    public Guid StageId { get; set; }
+    public string StageName { get; set; } = string.Empty;
+    public int StageOrder { get; set; }
+    public string StageType { get; set; } = string.Empty;
+    public DateOnly? StartDate { get; set; }
+    public DateOnly? EndDate { get; set; }
+
+    /// <summary>
+    /// Danh sách các chỉ số (metric) được so sánh trong giai đoạn này.
+    /// Nếu người dùng truyền <c>metricName</c> thì danh sách này chỉ chứa 1 phần tử.
+    /// </summary>
+    public List<MetricStageComparisonDto> MetricComparisons { get; set; } = new();
+}
+
+/// <summary>
+/// So sánh một chỉ số (height / leaf count / ...) giữa 2 nhóm trong một giai đoạn.
+/// </summary>
+public class MetricStageComparisonDto
+{
+    public Guid MeasurementDefinitionId { get; set; }
+    public string MetricName { get; set; } = string.Empty;
+    public string? Unit { get; set; }
+    public decimal? TargetValue { get; set; }
+
+    public decimal? GroupAAverage { get; set; }
+    public decimal? GroupBAverage { get; set; }
+    public decimal? Difference => (GroupAAverage.HasValue && GroupBAverage.HasValue)
+        ? GroupBAverage.Value - GroupAAverage.Value
+        : null;
+    public double? DifferencePercent => (GroupAAverage.HasValue && GroupBAverage.HasValue && GroupAAverage.Value != 0)
+        ? Math.Round((double)(GroupBAverage.Value - GroupAAverage.Value) / (double)GroupAAverage.Value * 100, 2)
+        : null;
+
+    public int GroupASampleSize { get; set; }
+    public int GroupBSampleSize { get; set; }
+}

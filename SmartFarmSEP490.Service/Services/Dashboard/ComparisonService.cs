@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using SmartFarmSEP490.Model.DTOs;
 using SmartFarmSEP490.Model.Enums;
 using SmartFarmSEP490.Repository.DbContexts;
@@ -168,6 +169,151 @@ public class ComparisonService : IComparisonService
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// So sánh chỉ số tăng trưởng trung bình giữa 2 nhóm theo từng giai đoạn.
+    /// </summary>
+    public async Task<GroupGrowthComparisonDto?> GetGroupGrowthComparisonAsync(
+        Guid experimentId,
+        Guid groupAId,
+        Guid groupBId,
+        string? metricName = null)
+    {
+        if (groupAId == groupBId)
+            throw new ArgumentException("GroupAId và GroupBId phải khác nhau.");
+
+        var experiment = await _experimentRepository.GetByIdAsync(experimentId);
+        if (experiment == null) return null;
+
+        var groups = await _groupRepository.GetByExperimentAsync(experimentId);
+        var groupA = groups.FirstOrDefault(g => g.Id == groupAId);
+        var groupB = groups.FirstOrDefault(g => g.Id == groupBId);
+        if (groupA == null || groupB == null)
+            throw new InvalidOperationException("Không tìm thấy một trong hai nhóm trong thực nghiệm này.");
+
+        // Lấy tất cả batches của experiment, gán group cho từng batch
+        var batches = await _context.Batches
+            .Where(b => b.ExperimentId == experimentId && b.DeletedAt == null)
+            .ToListAsync();
+
+        var batchIdsA = batches.Where(b => b.GroupId == groupAId).Select(b => b.Id).ToHashSet();
+        var batchIdsB = batches.Where(b => b.GroupId == groupBId).Select(b => b.Id).ToHashSet();
+
+        // Lấy các định nghĩa chỉ số (MeasurementDefinitions) thuộc experiment, lọc theo metricName nếu có
+        var measurementDefs = await _context.MeasurementDefinitions
+            .Where(m => m.ExperimentId == experimentId)
+            .ToListAsync();
+
+        if (!string.IsNullOrWhiteSpace(metricName))
+        {
+            var keyword = metricName.Trim().ToLower();
+            measurementDefs = measurementDefs
+                .Where(m => !string.IsNullOrEmpty(m.MetricName) && m.MetricName.ToLower().Contains(keyword))
+                .ToList();
+        }
+
+        // Lấy các bản ghi đo (MeasurementRecords) của 2 nhóm
+        var recordsA = await _context.MeasurementRecords
+            .Where(r => r.ExperimentId == experimentId
+                && batchIdsA.Contains(r.BatchId)
+                && r.DeletedAt == null
+                && r.Value.HasValue)
+            .ToListAsync();
+
+        var recordsB = await _context.MeasurementRecords
+            .Where(r => r.ExperimentId == experimentId
+                && batchIdsB.Contains(r.BatchId)
+                && r.DeletedAt == null
+                && r.Value.HasValue)
+            .ToListAsync();
+
+        // Lấy các giai đoạn (ExperimentStages) của experiment, sắp xếp theo thứ tự
+        var stages = await _context.ExperimentStages
+            .Where(s => s.ExperimentId == experimentId)
+            .OrderBy(s => s.StageOrder)
+            .ToListAsync();
+
+        // Gom bản ghi theo (StageId, MeasurementDefinitionId) để tính trung bình
+        var stageComparisons = new List<StageGrowthComparisonDto>();
+
+        foreach (var stage in stages)
+        {
+            var metricComparisons = new List<MetricStageComparisonDto>();
+
+            foreach (var md in measurementDefs)
+            {
+                var groupAValues = recordsA
+                    .Where(r => r.ExperimentStageId == stage.Id && r.MeasurementDefinitionId == md.Id)
+                    .Select(r => r.Value!.Value)
+                    .ToList();
+                var groupBValues = recordsB
+                    .Where(r => r.ExperimentStageId == stage.Id && r.MeasurementDefinitionId == md.Id)
+                    .Select(r => r.Value!.Value)
+                    .ToList();
+
+                // Bỏ qua metric không có dữ liệu ở cả 2 nhóm
+                if (groupAValues.Count == 0 && groupBValues.Count == 0)
+                    continue;
+
+                decimal? avgA = groupAValues.Count > 0 ? Math.Round(groupAValues.Average(), 4) : null;
+                decimal? avgB = groupBValues.Count > 0 ? Math.Round(groupBValues.Average(), 4) : null;
+
+                metricComparisons.Add(new MetricStageComparisonDto
+                {
+                    MeasurementDefinitionId = md.Id,
+                    MetricName = md.MetricName,
+                    Unit = md.Unit,
+                    TargetValue = md.TargetValue,
+                    GroupAAverage = avgA,
+                    GroupBAverage = avgB,
+                    GroupASampleSize = groupAValues.Count,
+                    GroupBSampleSize = groupBValues.Count
+                });
+            }
+
+            // Bỏ qua stage không có dữ liệu metric nào
+            if (metricComparisons.Count == 0)
+                continue;
+
+            stageComparisons.Add(new StageGrowthComparisonDto
+            {
+                StageId = stage.Id,
+                StageName = stage.StageName,
+                StageOrder = stage.StageOrder,
+                StageType = stage.StageType.ToString(),
+                StartDate = stage.StartDate,
+                EndDate = stage.EndDate,
+                MetricComparisons = metricComparisons
+            });
+        }
+
+        return new GroupGrowthComparisonDto
+        {
+            ExperimentId = experimentId,
+            ExperimentCode = experiment.ExperimentCode,
+            Title = experiment.Title,
+            GeneratedAt = DateTime.UtcNow,
+            GroupA = new GroupComparisonSideDto
+            {
+                GroupId = groupA.Id,
+                GroupName = groupA.GroupName,
+                GroupType = groupA.GroupType.ToString(),
+                TreatmentDescription = groupA.TreatmentDescription,
+                TotalBatches = batchIdsA.Count,
+                TotalMeasurementRecords = recordsA.Count
+            },
+            GroupB = new GroupComparisonSideDto
+            {
+                GroupId = groupB.Id,
+                GroupName = groupB.GroupName,
+                GroupType = groupB.GroupType.ToString(),
+                TreatmentDescription = groupB.TreatmentDescription,
+                TotalBatches = batchIdsB.Count,
+                TotalMeasurementRecords = recordsB.Count
+            },
+            StageComparisons = stageComparisons
+        };
     }
 
     private MetricStatisticsDto CalculateStatistics(List<decimal> values)
