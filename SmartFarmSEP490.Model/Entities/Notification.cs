@@ -1,6 +1,7 @@
 using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using SmartFarmSEP490.Model.Enums;
 
 namespace SmartFarmSEP490.Model.Entities
 {
@@ -25,7 +26,7 @@ namespace SmartFarmSEP490.Model.Entities
         public string? Message { get; set; }
 
         [Required]
-        public string Priority { get; set; } = "Low";
+        public AlertSeverity Priority { get; set; } = AlertSeverity.Medium;
 
         [MaxLength(100)]
         public string? ReferenceTable { get; set; }

@@ -26,4 +26,7 @@ public interface ITaskRepository
     // Overdue sweep (UTC-based, idempotent)
     Task<List<Model.Task>> GetOverdueCandidatesAsync(DateTime asOfUtc, CancellationToken ct = default);
     Task<int> MarkOverdueAsync(DateTime asOfUtc, CancellationToken ct = default);
+
+    // Reminder: task chưa hoàn thành có DueDate trong ngày [dayStartUtc, dayEndUtc)
+    Task<List<Model.Task>> GetActiveTasksDueOnDayAsync(DateTime dayStartUtc, DateTime dayEndUtc, CancellationToken ct = default);
 }

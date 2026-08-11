@@ -1,7 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using SmartFarmSEP490.Model.DTOs;
+using SmartFarmSEP490.API.Dtos;
 using SmartFarmSEP490.Service.Interfaces.Tasks;
 
 namespace SmartFarmSEP490.API.Controllers;
@@ -23,14 +23,36 @@ public class TaskImagesController : ControllerBase
         ?? throw new UnauthorizedAccessException("User identifier claim not found."));
 
     /// <summary>
-    /// Upload Task Image - dung cho Observation hoac Inspection
+    /// Upload Task Image - dùng cho Observation hoặc Inspection.
+    /// FE gửi multipart/form-data gồm:
+    ///   - file: IFormFile (required)
+    ///   - experimentId: guid (required)
+    ///   - batchId: guid? (optional)
+    ///   - taskReportId: guid? (optional)
+    ///   - caption: string? (optional)
+    ///   - capturedAt: datetime? (optional, ISO 8601)
+    /// File sẽ được push lên Cloudinary, response trả về imageUrl hosted.
     /// </summary>
     [HttpPost("upload")]
-    public async Task<IActionResult> UploadImage([FromBody] UploadTaskImageDto dto)
+    [Consumes("multipart/form-data")]
+    [RequestSizeLimit(20_000_000)] // 20 MB
+    public async Task<IActionResult> UploadImage([FromForm] UploadTaskImageForm form, CancellationToken ct)
     {
-        if (!ModelState.IsValid) return BadRequest(ModelState);
+        if (form == null || form.File == null || form.File.Length == 0)
+            return BadRequest("File is required.");
+        if (form.ExperimentId == Guid.Empty)
+            return BadRequest("experimentId is required.");
 
-        var result = await _imageService.UploadAsync(dto, GetUserId());
+        var result = await _imageService.UploadAsync(
+            form.File,
+            form.ExperimentId,
+            form.BatchId,
+            form.TaskReportId,
+            form.Caption,
+            form.CapturedAt,
+            GetUserId(),
+            ct);
+
         return result == null ? BadRequest("Failed to upload image.") : Ok(result);
     }
 

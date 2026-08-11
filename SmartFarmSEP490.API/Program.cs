@@ -65,7 +65,7 @@ using SmartFarmSEP490.Repository.Interfaces.Notifications;
 using SmartFarmSEP490.Repository.Implementations.Notifications;
 using SmartFarmSEP490.Service.Interfaces.Notifications;
 using SmartFarmSEP490.Service.Services.Notifications;
-using SmartFarmSEP490.Service.Hubs;
+using SmartFarmSEP490.Service.WebSockets;
 using SmartFarmSEP490.Repository.Interfaces.Sensors;
 using SmartFarmSEP490.Repository.Implementations.Sensors;
 using SmartFarmSEP490.Repository.Interfaces.Alerts;
@@ -174,6 +174,10 @@ builder.Services.AddScoped<IReportExportService, ReportExportService>();
 builder.Services.AddScoped<IOverdueTaskService, OverdueTaskService>();
 builder.Services.AddHostedService<OverdueTaskSweepBackgroundService>();
 
+// Reminder: nhắc nhở 16:30 ICT hằng ngày task chưa hoàn thành trong ngày
+builder.Services.AddScoped<IReminderTaskService, ReminderTaskService>();
+builder.Services.AddHostedService<ReminderSweepBackgroundService>();
+
 var jwtSettings = builder.Configuration.GetSection("Jwt");
 var key = Encoding.UTF8.GetBytes(jwtSettings["Key"]!);
 
@@ -203,9 +207,17 @@ builder.Services.AddAuthentication(options =>
         {
             var accessToken = context.Request.Query["access_token"];
             var path = context.HttpContext.Request.Path;
-            if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/notificationHub"))
+            if (!string.IsNullOrEmpty(accessToken)
+                && (path.StartsWithSegments("/notificationHub") || path.StartsWithSegments("/ws")))
             {
                 context.Token = accessToken;
+            }
+
+            // Hỗ trợ query "?token=" cho WebSocket endpoint
+            var wsToken = context.Request.Query["token"];
+            if (!string.IsNullOrEmpty(wsToken) && path.StartsWithSegments("/ws"))
+            {
+                context.Token = wsToken;
             }
             return Task.CompletedTask;
         },
@@ -249,7 +261,7 @@ builder.Services.AddMemoryCache();
 builder.Services.AddFluentValidationAutoValidation();
 builder.Services.AddValidatorsFromAssemblyContaining<CreateTaskDtoValidator>();
 builder.Services.AddHttpContextAccessor();
-builder.Services.AddSignalR();
+builder.Services.AddSingleton<SmartFarmSEP490.Service.WebSockets.IWebSocketConnectionManager, SmartFarmSEP490.Service.WebSockets.WebSocketConnectionManager>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
@@ -286,10 +298,13 @@ try
 
 
 
+    // if (app.Environment.IsDevelopment())
+    // {
     //if (app.Environment.IsDevelopment())
     //{
         app.UseSwagger();
         app.UseSwaggerUI();
+    // }
     //}
 
     app.UseCors("AllowAll");
@@ -309,12 +324,19 @@ try
     app.UseExceptionHandler();
     app.UseRateLimiting();
     app.UseIdempotency();
+
+    // WebSocket raw: bật UseWebSockets + custom middleware (auth JWT qua query ?token=)
+    app.UseWebSockets(new Microsoft.AspNetCore.Builder.WebSocketOptions
+    {
+        KeepAliveInterval = TimeSpan.FromSeconds(30)
+    });
+    app.UseMiddleware<SmartFarmSEP490.Service.WebSockets.WebSocketMiddleware>();
+
     app.UseAuthentication();
     app.UseAuthorization();
 
     app.MapControllers();
-    app.MapHub<NotificationHub>("/notificationHub");
-
+ //   app.MapHub<NotificationHub>("/notificationHub");
     app.Run();
 }
 catch (Exception ex)

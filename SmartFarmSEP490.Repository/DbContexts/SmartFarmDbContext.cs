@@ -200,17 +200,36 @@ public partial class SmartFarmDbContext : DbContext
                 .HasConstraintName("Areas_FarmId_fkey");
         });
 
-        modelBuilder.Entity<SmartFarmSEP490.Model.Entities.Notification>()
-            .HasOne(n => n.Recipient)
-            .WithMany(u => u.NotificationRecipients)
-            .HasForeignKey(n => n.RecipientId)
-            .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<SmartFarmSEP490.Model.Entities.Notification>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("Notifications_pkey");
 
-        modelBuilder.Entity<SmartFarmSEP490.Model.Entities.Notification>()
-            .HasOne(n => n.Sender)
-            .WithMany(u => u.NotificationSenders)
-            .HasForeignKey(n => n.SenderId)
-            .OnDelete(DeleteBehavior.SetNull);
+            entity.Property(e => e.Id).HasColumnName("Id");
+            entity.Property(e => e.RecipientId).HasColumnName("RecipientId").IsRequired();
+            entity.Property(e => e.SenderId).HasColumnName("SenderId");
+            entity.Property(e => e.NotificationType).HasColumnName("NotificationType").HasMaxLength(50).IsRequired();
+            entity.Property(e => e.Title).HasColumnName("Title").HasMaxLength(150).IsRequired();
+            entity.Property(e => e.Message).HasColumnName("Message");
+            // Priority is a Postgres enum "AlertSeverity" with values: Low, Medium, High, Critical
+            entity.Property(e => e.Priority)
+                .HasColumnName("Priority")
+                .HasDefaultValue(AlertSeverity.Medium);
+            entity.Property(e => e.ReferenceTable).HasColumnName("ReferenceTable").HasMaxLength(100);
+            entity.Property(e => e.ReferenceId).HasColumnName("ReferenceId");
+            entity.Property(e => e.IsRead).HasColumnName("IsRead").HasDefaultValue(false);
+            entity.Property(e => e.ReadAt).HasColumnName("ReadAt");
+            entity.Property(e => e.CreatedAt).HasColumnName("CreatedAt").HasDefaultValueSql("now()").HasColumnType("timestamp with time zone");
+
+            entity.HasOne(n => n.Recipient)
+                .WithMany(u => u.NotificationRecipients)
+                .HasForeignKey(n => n.RecipientId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(n => n.Sender)
+                .WithMany(u => u.NotificationSenders)
+                .HasForeignKey(n => n.SenderId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
 
         modelBuilder.Entity<Batch>(entity =>
         {

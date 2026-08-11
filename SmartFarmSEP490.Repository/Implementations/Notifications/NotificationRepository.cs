@@ -35,6 +35,11 @@ namespace SmartFarmSEP490.Repository.Implementations.Notifications
                 .ToListAsync();
         }
 
+        public async Task<int> GetTotalCountAsync(Guid userId)
+        {
+            return await _context.Notifications.CountAsync(n => n.RecipientId == userId);
+        }
+
         public async Task<int> GetUnreadCountAsync(Guid userId)
         {
             return await _context.Notifications
