@@ -47,7 +47,8 @@ public class ExperimentRepository : IExperimentRepository
 
     public async Task<M.Experiment> CreateWithStagesAsync(M.Experiment entity, IEnumerable<M.ExperimentStage> stages)
     {
-        using var tx = await _context.Database.BeginTransactionAsync();
+        // KHONG mo transaction o day vi method nay duoc goi tu CreateFromRequestAsync 
+        // da co transaction o Service layer
         entity.CreatedAt = DateTime.UtcNow; entity.UpdatedAt = DateTime.UtcNow;
         await _context.Experiments.AddAsync(entity);
         await _context.SaveChangesAsync();
@@ -60,7 +61,6 @@ public class ExperimentRepository : IExperimentRepository
         }
         await _context.ExperimentStages.AddRangeAsync(stages);
         await _context.SaveChangesAsync();
-        await tx.CommitAsync();
         return entity;
     }
 
