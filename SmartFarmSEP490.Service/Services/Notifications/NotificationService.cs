@@ -1,30 +1,34 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.SignalR;
 using SmartFarmSEP490.Model.DTOs;
 using SmartFarmSEP490.Model.Entities;
+using SmartFarmSEP490.Model.Enums;
 using SmartFarmSEP490.Repository.Interfaces.Notifications;
-using SmartFarmSEP490.Service.Hubs;
 using SmartFarmSEP490.Service.Interfaces.Notifications;
+using SmartFarmSEP490.Service.WebSockets;
 
 namespace SmartFarmSEP490.Service.Services.Notifications
 {
     public class NotificationService : INotificationService
     {
         private readonly INotificationRepository _notificationRepository;
-        private readonly IHubContext<NotificationHub> _hubContext;
+        private readonly IWebSocketConnectionManager _wsManager;
 
         public NotificationService(
-            INotificationRepository notificationRepository, 
-            IHubContext<NotificationHub> hubContext)
+            INotificationRepository notificationRepository,
+            IWebSocketConnectionManager wsManager)
         {
             _notificationRepository = notificationRepository;
-            _hubContext = hubContext;
+            _wsManager = wsManager;
         }
 
         public async Task<NotificationDto> PushNotificationAsync(CreateNotificationDto request)
         {
+            // Parse priority string to enum (handles null/empty gracefully)
+            if (!Enum.TryParse<AlertSeverity>(request.Priority, true, out var priority))
+                priority = AlertSeverity.Medium;
+
             var notification = new Notification
             {
                 RecipientId = request.RecipientId,
@@ -32,7 +36,7 @@ namespace SmartFarmSEP490.Service.Services.Notifications
                 Title = request.Title,
                 Message = request.Message,
                 NotificationType = request.NotificationType,
-                Priority = request.Priority,
+                Priority = priority,
                 ReferenceTable = request.ReferenceTable,
                 ReferenceId = request.ReferenceId
             };
@@ -47,15 +51,22 @@ namespace SmartFarmSEP490.Service.Services.Notifications
                 Title = notification.Title,
                 Message = notification.Message,
                 NotificationType = notification.NotificationType,
-                Priority = notification.Priority,
+                Priority = notification.Priority.ToString(),
                 IsRead = notification.IsRead,
                 ReferenceTable = notification.ReferenceTable,
                 ReferenceId = notification.ReferenceId,
                 CreatedAt = notification.CreatedAt
             };
 
-            // Push to SignalR clients connected as this user
-            await _hubContext.Clients.Group($"User_{notification.RecipientId}").SendAsync("ReceiveNotification", dto);
+            // Push realtime tới mọi WebSocket connection đang mở của user
+            try
+            {
+                await _wsManager.SendToUserAsync(notification.RecipientId, "ReceiveNotification", dto);
+            }
+            catch (Exception)
+            {
+                // Realtime failure không nên nuốt notification đã lưu DB
+            }
 
             return dto;
         }
@@ -65,6 +76,7 @@ namespace SmartFarmSEP490.Service.Services.Notifications
             int skip = (pageNumber - 1) * pageSize;
             
             var notifications = await _notificationRepository.GetUserNotificationsAsync(userId, skip, pageSize);
+            var totalCount = await _notificationRepository.GetTotalCountAsync(userId);
             
             var dtoList = notifications.Select(n => new NotificationDto
             {
@@ -74,7 +86,7 @@ namespace SmartFarmSEP490.Service.Services.Notifications
                 Title = n.Title,
                 Message = n.Message,
                 NotificationType = n.NotificationType,
-                Priority = n.Priority,
+                Priority = n.Priority.ToString(),
                 IsRead = n.IsRead,
                 ReadAt = n.ReadAt,
                 ReferenceTable = n.ReferenceTable,
@@ -82,7 +94,7 @@ namespace SmartFarmSEP490.Service.Services.Notifications
                 CreatedAt = n.CreatedAt
             }).ToList();
 
-            return new PaginatedList<NotificationDto>(dtoList, 1000, pageNumber, pageSize);
+            return new PaginatedList<NotificationDto>(dtoList, totalCount, pageNumber, pageSize);
         }
 
         public async Task<int> GetUnreadCountAsync(Guid userId)

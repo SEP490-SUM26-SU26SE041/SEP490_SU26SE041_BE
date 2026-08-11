@@ -9,6 +9,7 @@ namespace SmartFarmSEP490.Repository.Interfaces.Notifications
     {
         Task<Notification> AddNotificationAsync(Notification notification);
         Task<List<Notification>> GetUserNotificationsAsync(Guid userId, int skip, int take);
+        Task<int> GetTotalCountAsync(Guid userId);
         Task<int> GetUnreadCountAsync(Guid userId);
         Task<Notification?> GetNotificationByIdAsync(Guid id);
         Task UpdateNotificationAsync(Notification notification);

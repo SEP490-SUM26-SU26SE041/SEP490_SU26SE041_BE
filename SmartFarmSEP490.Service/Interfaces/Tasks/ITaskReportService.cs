@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Http;
 using SmartFarmSEP490.Model.DTOs;
 
 namespace SmartFarmSEP490.Service.Interfaces.Tasks;
@@ -14,7 +15,15 @@ public interface ITaskReportService
 
 public interface ITaskImageService
 {
-    Task<PlantImageResponseDto?> UploadAsync(UploadTaskImageDto dto, Guid uploadedBy);
+    Task<PlantImageResponseDto?> UploadAsync(
+        IFormFile file,
+        Guid experimentId,
+        Guid? batchId,
+        Guid? taskReportId,
+        string? caption,
+        DateTime? capturedAt,
+        Guid uploadedBy,
+        CancellationToken ct = default);
     Task<List<PlantImageResponseDto>> GetByTaskReportIdAsync(Guid taskReportId);
     Task<List<PlantImageResponseDto>> GetByBatchIdAsync(Guid batchId);
     Task<bool> DeleteAsync(Guid id, Guid userId);

@@ -1,6 +1,8 @@
+using Microsoft.AspNetCore.Http;
 using SmartFarmSEP490.Model;
 using SmartFarmSEP490.Model.DTOs;
 using SmartFarmSEP490.Repository.Interfaces.Tasks;
+using SmartFarmSEP490.Service.Interfaces.Commons;
 using SmartFarmSEP490.Service.Interfaces.Tasks;
 
 namespace SmartFarmSEP490.Service.Services.Tasks;
@@ -8,24 +10,40 @@ namespace SmartFarmSEP490.Service.Services.Tasks;
 public class TaskImageService : ITaskImageService
 {
     private readonly IPlantImageRepository _imageRepository;
+    private readonly ICloudinaryService _cloudinaryService;
 
-    public TaskImageService(IPlantImageRepository imageRepository)
+    public TaskImageService(IPlantImageRepository imageRepository, ICloudinaryService cloudinaryService)
     {
         _imageRepository = imageRepository;
+        _cloudinaryService = cloudinaryService;
     }
 
-    public async System.Threading.Tasks.Task<PlantImageResponseDto?> UploadAsync(UploadTaskImageDto dto, Guid uploadedBy)
+    public async System.Threading.Tasks.Task<PlantImageResponseDto?> UploadAsync(
+        IFormFile file,
+        Guid experimentId,
+        Guid? batchId,
+        Guid? taskReportId,
+        string? caption,
+        DateTime? capturedAt,
+        Guid uploadedBy,
+        CancellationToken ct = default)
     {
+        if (file == null || file.Length == 0)
+            return null;
+
+        // Push the actual file bytes to Cloudinary; receive a hosted imageUrl
+        var imageUrl = await _cloudinaryService.UploadImageAsync(file, "smartfarm/task-images", ct);
+
         var image = new PlantImage
         {
             Id = Guid.NewGuid(),
-            ExperimentId = dto.ExperimentId,
-            BatchId = dto.BatchId,
-            TaskReportId = dto.TaskReportId,
-            ImageUrl = dto.ImageUrl,
-            Caption = dto.Caption,
+            ExperimentId = experimentId,
+            BatchId = batchId,
+            TaskReportId = taskReportId,
+            ImageUrl = imageUrl,
+            Caption = caption,
             UploadedBy = uploadedBy,
-            CapturedAt = dto.CapturedAt,
+            CapturedAt = capturedAt,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -44,6 +62,7 @@ public class TaskImageService : ITaskImageService
     public async System.Threading.Tasks.Task<List<PlantImageResponseDto>> GetByBatchIdAsync(Guid batchId)
     {
         var images = await _imageRepository.GetByBatchIdAsync(batchId);
+        // fallback - keep existing repo call if it expects taskReportId - we'll route via the right repo method below
         var results = new List<PlantImageResponseDto>();
         foreach (var i in images) results.Add(await MapToResponseDto(i));
         return results;

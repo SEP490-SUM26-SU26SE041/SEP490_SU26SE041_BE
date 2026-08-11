@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using SmartFarmSEP490.Model;
 using SmartFarmSEP490.Model.DTOs;
 using SmartFarmSEP490.Model.Enums;
@@ -9,7 +10,9 @@ using SmartFarmSEP490.Repository.Interfaces.ExperimentStages;
 using SmartFarmSEP490.Repository.Interfaces.Experiments;
 using SmartFarmSEP490.Repository.Interfaces.Tasks;
 using SmartFarmSEP490.Service.Helpers;
+using SmartFarmSEP490.Service.Interfaces.Notifications;
 using SmartFarmSEP490.Service.Interfaces.Tasks;
+using SmartFarmSEP490.Service.WebSockets;
 
 namespace SmartFarmSEP490.Service.Services.Tasks;
 
@@ -24,7 +27,10 @@ public class TaskService : ITaskService
     private readonly IBatchRepository _batchRepository;
     private readonly IUserRepository _userRepository;
     private readonly IOverdueTaskService _overdueTaskService;
+    private readonly INotificationService _notificationService;
+    private readonly IWebSocketConnectionManager _wsManager;
     private readonly SmartFarmDbContext _context;
+    private readonly ILogger<TaskService> _logger;
 
     private static readonly string[] AssignableRoles = { "Technician", "Student" };
 
@@ -38,7 +44,10 @@ public class TaskService : ITaskService
         IBatchRepository batchRepository,
         IUserRepository userRepository,
         IOverdueTaskService overdueTaskService,
-        SmartFarmDbContext context)
+        INotificationService notificationService,
+        IWebSocketConnectionManager wsManager,
+        SmartFarmDbContext context,
+        ILogger<TaskService> logger)
     {
         _taskRepository = taskRepository;
         _assignmentRepository = assignmentRepository;
@@ -49,7 +58,10 @@ public class TaskService : ITaskService
         _batchRepository = batchRepository;
         _userRepository = userRepository;
         _overdueTaskService = overdueTaskService;
+        _notificationService = notificationService;
+        _wsManager = wsManager;
         _context = context;
+        _logger = logger;
     }
 
     public async System.Threading.Tasks.Task<bool> ValidateUserRoleAsync(Guid userId, params string[] allowedRoles)
@@ -229,6 +241,15 @@ public class TaskService : ITaskService
         if (dto.DueDate.HasValue && dto.DueDate.Value < DateTime.UtcNow)
             return null;
 
+        // Snapshot trước khi cập nhật để biết có thay đổi field nào đáng báo cho assignee hay không
+        var hadImportantChange =
+            (dto.Title != null && dto.Title != task.Title) ||
+            (dto.Description != null && dto.Description != task.Description) ||
+            (dto.DueDate.HasValue && task.DueDate != null &&
+                Math.Abs((dto.DueDate.Value - task.DueDate.Value).TotalMinutes) > 0.5) ||
+            (dto.RequiredSkillDescription != null && dto.RequiredSkillDescription != task.RequiredSkillDescription) ||
+            (!string.IsNullOrEmpty(dto.Status) && Enum.TryParse<Model.Enums.TaskStatus>(dto.Status, true, out var tsNew) && tsNew != task.Status);
+
         if (dto.ExperimentStageId != null) task.ExperimentStageId = dto.ExperimentStageId;
         if (dto.BatchId != null) task.BatchId = dto.BatchId;
         if (dto.CareScheduleId != null) task.CareScheduleId = dto.CareScheduleId;
@@ -256,6 +277,26 @@ public class TaskService : ITaskService
                 });
             }
             task.TaskSkillRequirements = await _skillRequirementRepository.GetByTaskAsync(id);
+        }
+
+        // Push notification nếu có thay đổi quan trọng và có người đang được giao
+        if (hadImportantChange && task.AssignedTo != null && task.AssignedTo != userId)
+        {
+            try
+            {
+                await _notificationService.PushNotificationAsync(new CreateNotificationDto
+                {
+                    RecipientId = task.AssignedTo.Value,
+                    SenderId = userId,
+                    NotificationType = "TaskUpdated",
+                    Title = "Task được cập nhật",
+                    Message = $"Task \"{task.Title}\" vừa được cập nhật. Vui lòng kiểm tra lại thông tin.",
+                    Priority = "Medium",
+                    ReferenceTable = "Task",
+                    ReferenceId = task.Id
+                });
+            }
+            catch (Exception) { }
         }
 
         return await MapToResponseDto(task);
@@ -532,6 +573,26 @@ public class TaskService : ITaskService
         task.UpdatedAt = DateTime.UtcNow;
         await _taskRepository.UpdateAsync(task);
 
+        try
+        {
+            await _notificationService.PushNotificationAsync(new CreateNotificationDto
+            {
+                RecipientId = dto.AssigneeId,
+                SenderId = assignedById,
+                NotificationType = "TaskAssigned",
+                Title = "Bạn có công việc mới",
+                Message = $"Bạn được giao task: {task.Title}. Hạn chót: {task.DueDate:yyyy-MM-dd HH:mm} ICT.",
+                Priority = "High",
+                ReferenceTable = "Task",
+                ReferenceId = task.Id
+            });
+        }
+        catch (Exception ex)
+        {
+            // notification failure must not break assignment
+            _logger?.LogError(ex, "Push notification failed for AssignTask taskId={TaskId} assigneeId={AssigneeId}", dto.TaskId, dto.AssigneeId);
+        }
+
         return await MapToResponseDto(task);
     }
 
@@ -571,6 +632,25 @@ public class TaskService : ITaskService
         task.UpdatedAt = DateTime.UtcNow;
         await _taskRepository.UpdateAsync(task);
 
+        try
+        {
+            await _notificationService.PushNotificationAsync(new CreateNotificationDto
+            {
+                RecipientId = dto.NewAssigneeId,
+                SenderId = reassignedById,
+                NotificationType = "TaskAssigned",
+                Title = "Bạn được phân công lại task",
+                Message = $"Bạn vừa được phân công task: {task.Title}. Lý do: {dto.Reason}.",
+                Priority = "High",
+                ReferenceTable = "Task",
+                ReferenceId = task.Id
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Push notification failed for ReassignTask taskId={TaskId} newAssigneeId={NewAssigneeId}", dto.TaskId, dto.NewAssigneeId);
+        }
+
         return await MapToResponseDto(task);
     }
 
@@ -586,16 +666,92 @@ public class TaskService : ITaskService
         }
         await _assignmentRepository.UpdateAsync(assignment);
 
+        Model.Task? parentTask = null;
         if (dto.Status == "Completed")
         {
-            var task = await _taskRepository.GetByIdAsync(assignment.TaskId);
-            if (task != null)
+            parentTask = await _taskRepository.GetByIdAsync(assignment.TaskId);
+            if (parentTask != null)
             {
-                task.Status = Model.Enums.TaskStatus.Completed;
-                task.UpdatedAt = DateTime.UtcNow;
-                await _taskRepository.UpdateAsync(task);
+                parentTask.Status = Model.Enums.TaskStatus.Completed;
+                parentTask.UpdatedAt = DateTime.UtcNow;
+                await _taskRepository.UpdateAsync(parentTask);
             }
         }
+
+        var creatorId = parentTask?.CreatedBy ?? Guid.Empty;
+
+        // === Real-time notifications ===
+        try
+        {
+            if (parentTask != null && dto.Status == "Completed")
+            {
+                // 1) Confirm cho chính assignee
+                await _notificationService.PushNotificationAsync(new CreateNotificationDto
+                {
+                    RecipientId = assignment.AssigneeId,
+                    NotificationType = "TaskCompleted",
+                    Title = "Hoàn thành task",
+                    Message = $"Bạn đã hoàn thành task \"{parentTask.Title}\".",
+                    Priority = "Medium",
+                    ReferenceTable = "Task",
+                    ReferenceId = parentTask.Id
+                });
+
+                // 2) Researcher (creator) được báo bằng notification
+                if (creatorId != Guid.Empty && creatorId != assignment.AssigneeId)
+                {
+                    await _notificationService.PushNotificationAsync(new CreateNotificationDto
+                    {
+                        RecipientId = creatorId,
+                        SenderId = assignment.AssigneeId,
+                        NotificationType = "TaskCompleted",
+                        Title = "Task đã được hoàn thành",
+                        Message = $"Task \"{parentTask.Title}\" vừa được hoàn thành.",
+                        Priority = "Medium",
+                        ReferenceTable = "Task",
+                        ReferenceId = parentTask.Id
+                    });
+                }
+
+                // 3) Realtime dashboard update — chỉ push tới researcher tạo task (qua WebSocket)
+                if (creatorId != Guid.Empty)
+                {
+                    var dashboardPayload = new
+                    {
+                        TaskId = parentTask.Id,
+                        Status = "Completed",
+                        CompletedAt = DateTime.UtcNow
+                    };
+                    try
+                    {
+                        await _wsManager.SendToUserAsync(creatorId, "DashboardUpdated", dashboardPayload);
+                    }
+                    catch (Exception) { }
+                }
+            }
+            else if (dto.Status == "Cancelled" || dto.Status == "Resigned")
+            {
+                // Gửi cho researcher (task creator) biết
+                var t = await _taskRepository.GetByIdAsync(assignment.TaskId);
+                var tCreatorId = t?.CreatedBy ?? Guid.Empty;
+                if (t != null && tCreatorId != Guid.Empty && tCreatorId != assignment.AssigneeId)
+                {
+                    var verb = dto.Status == "Cancelled" ? "đã bị hủy" : "đã được hủy nhận";
+                    await _notificationService.PushNotificationAsync(new CreateNotificationDto
+                    {
+                        RecipientId = tCreatorId,
+                        SenderId = assignment.AssigneeId,
+                        NotificationType = dto.Status == "Cancelled" ? "TaskCancelled" : "AssignmentResigned",
+                        Title = $"Phân công task {verb}",
+                        Message = $"Phân công cho task \"{t.Title}\" {verb}.",
+                        Priority = "High",
+                        ReferenceTable = "Task",
+                        ReferenceId = t.Id
+                    });
+                }
+            }
+        }
+        catch (Exception) { /* notification failure must not break assignment status */ }
 
         return MapAssignmentToResponseDto(assignment);
     }

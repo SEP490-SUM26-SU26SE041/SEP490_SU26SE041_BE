@@ -22,7 +22,8 @@ namespace SmartFarmSEP490.API.Controllers
 
         private Guid GetUserId()
         {
-            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var userIdStr = User.FindFirstValue(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)
+                ?? User.FindFirstValue(ClaimTypes.NameIdentifier);
             return Guid.TryParse(userIdStr, out var id) ? id : Guid.Empty;
         }
 

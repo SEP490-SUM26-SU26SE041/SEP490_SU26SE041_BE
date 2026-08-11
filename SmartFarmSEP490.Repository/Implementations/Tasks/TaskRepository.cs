@@ -230,4 +230,19 @@ public class TaskRepository : ITaskRepository
                 .SetProperty(t => t.Status, TaskStatus.Overdue)
                 .SetProperty(t => t.UpdatedAt, DateTime.UtcNow), ct);
     }
+
+    public async Task<List<Model.Task>> GetActiveTasksDueOnDayAsync(
+        DateTime dayStartUtc,
+        DateTime dayEndUtc,
+        CancellationToken ct = default)
+    {
+        return await _context.Tasks
+            .AsNoTracking()
+            .Where(t => t.DueDate != null
+                     && t.DueDate >= dayStartUtc
+                     && t.DueDate < dayEndUtc
+                     && (t.Status == TaskStatus.Pending || t.Status == TaskStatus.InProgress))
+            .OrderBy(t => t.DueDate)
+            .ToListAsync(ct);
+    }
 }
