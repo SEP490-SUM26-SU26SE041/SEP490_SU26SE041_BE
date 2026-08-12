@@ -149,6 +149,12 @@ builder.Services.AddScoped<ISystemLogService, SystemLogService>();
 builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 
+// Cloudinary - file upload service
+builder.Services.Configure<SmartFarmSEP490.Model.DTOs.CloudinarySettings>(
+    builder.Configuration.GetSection("CloudinarySettings"));
+builder.Services.AddScoped<SmartFarmSEP490.Service.Interfaces.Commons.ICloudinaryService,
+                          SmartFarmSEP490.Service.Services.Commons.CloudinaryService>();
+
 builder.Services.AddScoped<ITaskRepository, TaskRepository>();
 builder.Services.AddScoped<ITaskAssignmentRepository, TaskAssignmentRepository>();
 builder.Services.AddScoped<ITaskSkillRequirementRepository, TaskSkillRequirementRepository>();
