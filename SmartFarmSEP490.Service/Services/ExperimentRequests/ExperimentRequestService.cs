@@ -206,7 +206,36 @@ public class ExperimentRequestService : IExperimentRequestService
 
                 if (dto.Result == ReviewResult.Approved)
                 {
-                    await AutoReserveAndRandomizeAsync(requestId, request);
+                    if (dto.ReservedBedIds != null && dto.ReservedBedIds.Count > 0)
+                    {
+                        var farmBedIds = await _bedAssignmentRepository.GetAvailableBedIdsByFarmAsync(request.FarmId);
+                        var invalidBeds = dto.ReservedBedIds.Where(id => !farmBedIds.Contains(id)).ToList();
+                        if (invalidBeds.Count > 0)
+                            throw new InvalidOperationException($"Mot so lo khong con trong hoac khong thuoc trai nay: {string.Join(", ", invalidBeds.Select(id => id.ToString()[..8]))}");
+
+                        var existingAssignments = await _bedAssignmentRepository.GetByRequestAsync(requestId);
+                        if (existingAssignments.Count > 0)
+                        {
+                            foreach (var existing in existingAssignments)
+                            {
+                                await _bedAssignmentRepository.DeleteAsync(existing.Id);
+                            }
+                        }
+
+                        var reservations = dto.ReservedBedIds.Select(bedId => new M.ExperimentBedAssignment
+                        {
+                            RequestId = requestId,
+                            ExperimentId = null,
+                            BedId = bedId,
+                            Status = AllocationStatus.Reserved,
+                            AssignedFrom = request.ExpectedStartDate ?? DateOnly.FromDateTime(DateTime.UtcNow)
+                        }).ToList();
+                        await _bedAssignmentRepository.CreateRangeAsync(reservations);
+                    }
+                    else
+                    {
+                        throw new InvalidOperationException("Vui long chon it nhat mot lo (bed) de duoc phep duyet yeu cau.");
+                    }
                 }
             }
 
