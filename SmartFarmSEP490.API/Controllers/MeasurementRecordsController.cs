@@ -23,7 +23,7 @@ public class MeasurementRecordsController : ControllerBase
         ?? throw new UnauthorizedAccessException("User identifier claim not found."));
 
     /// <summary>
-    /// Create Measurement Record
+    /// Create a single measurement record
     /// </summary>
     [HttpPost]
     public async Task<IActionResult> CreateRecord([FromBody] CreateMeasurementRecordDto dto)
@@ -32,6 +32,28 @@ public class MeasurementRecordsController : ControllerBase
 
         var result = await _recordService.CreateAsync(dto, GetUserId());
         return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
+    }
+
+    /// <summary>
+    /// Create many measurement records for one batch at the same time
+    /// (use case: technician measures 1 batch with N metrics → submit all N records in 1 request)
+    /// </summary>
+    [HttpPost("bulk")]
+    public async Task<IActionResult> CreateBulk([FromBody] BulkCreateMeasurementRecordDto dto)
+    {
+        if (!ModelState.IsValid) return BadRequest(ModelState);
+
+        try
+        {
+            var result = await _recordService.CreateBulkAsync(dto, GetUserId());
+            return result.Created == 0
+                ? BadRequest(new { success = false, message = "Không tạo được bản ghi nào.", data = result })
+                : Ok(new { success = true, message = $"Tạo {result.Created} bản ghi, bỏ qua {result.Skipped}.", data = result });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { success = false, message = ex.Message });
+        }
     }
 
     /// <summary>
