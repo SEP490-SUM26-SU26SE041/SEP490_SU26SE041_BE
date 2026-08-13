@@ -164,6 +164,7 @@ builder.Services.AddScoped<IPlantImageRepository, PlantImageRepository>();
 builder.Services.AddScoped<ITaskService, TaskService>();
 builder.Services.AddScoped<ITaskReportService, TaskReportService>();
 builder.Services.AddScoped<IMeasurementRecordService, MeasurementRecordService>();
+builder.Services.AddScoped<IMeasurementStatisticsService, MeasurementStatisticsService>();
 builder.Services.AddScoped<ITaskImageService, TaskImageService>();
 
 // Dashboard Services

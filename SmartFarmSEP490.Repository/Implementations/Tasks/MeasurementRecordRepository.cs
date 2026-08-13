@@ -2,6 +2,10 @@ using Microsoft.EntityFrameworkCore;
 using SmartFarmSEP490.Model;
 using SmartFarmSEP490.Repository.DbContexts;
 using SmartFarmSEP490.Repository.Interfaces.Tasks;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 using Task = System.Threading.Tasks.Task;
 
 namespace SmartFarmSEP490.Repository.Implementations.Tasks;
@@ -43,12 +47,34 @@ public class MeasurementRecordRepository : IMeasurementRecordRepository
             .OrderByDescending(m => m.MeasuredAt)
             .ToListAsync();
 
+    public async Task<List<MeasurementDefinition>> GetDefinitionsByIdsAsync(IEnumerable<Guid> ids)
+    {
+        var idList = ids.ToList();
+        if (idList.Count == 0) return new List<MeasurementDefinition>();
+        return await _context.MeasurementDefinitions
+            .Where(d => idList.Contains(d.Id))
+            .ToListAsync();
+    }
+
     public async Task<MeasurementRecord> CreateAsync(MeasurementRecord entity)
     {
-        entity.MeasuredAt = DateTime.UtcNow;
+        if (entity.MeasuredAt == default) entity.MeasuredAt = DateTime.UtcNow;
         await _context.MeasurementRecords.AddAsync(entity);
         await _context.SaveChangesAsync();
         return entity;
+    }
+
+    public async Task<List<MeasurementRecord>> CreateBulkAsync(IEnumerable<MeasurementRecord> entities)
+    {
+        var list = entities.ToList();
+        if (list.Count == 0) return list;
+        var now = DateTime.UtcNow;
+        foreach (var e in list)
+            if (e.MeasuredAt == default) e.MeasuredAt = now;
+
+        await _context.MeasurementRecords.AddRangeAsync(list);
+        await _context.SaveChangesAsync();
+        return list;
     }
 
     public async Task UpdateAsync(MeasurementRecord entity)
