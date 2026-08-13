@@ -58,8 +58,6 @@ public class BatchesController : ControllerBase
     {
         var result = await _batchService.GetByIdAsync(id);
         if (result == null) return NotFound();
-        if (IsManager()) return Forbid();
-        if (!await IsExperimentOwnerAsync(result.ExperimentId)) return Forbid();
         return Ok(result);
     }
 
