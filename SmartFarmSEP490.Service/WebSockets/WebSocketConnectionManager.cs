@@ -53,7 +53,10 @@ public class WebSocketConnectionManager : IWebSocketConnectionManager
         {
             @event = eventName,
             data = payload,
-            ts = DateTime.UtcNow
+            // UTC ISO string cho backend consumer
+            ts = DateTime.UtcNow,
+            // ISO-8601 offset +07:00 cho FE hiển thị real-time
+            tsVietnam = SmartFarmSEP490.Service.Helpers.VietnamTime.ToVietnamOffset(DateTime.UtcNow)
         };
         var json = JsonSerializer.Serialize(envelope, JsonOptions);
         var bytes = Encoding.UTF8.GetBytes(json);

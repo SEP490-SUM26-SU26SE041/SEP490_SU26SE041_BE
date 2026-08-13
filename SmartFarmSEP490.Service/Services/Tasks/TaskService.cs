@@ -79,13 +79,23 @@ public class TaskService : ITaskService
         if (string.IsNullOrWhiteSpace(dto.Title) || dto.Title.Trim().Length < 3)
             return null;
 
-        if (dto.DueDate.HasValue && dto.DueDate.Value < DateTime.UtcNow)
-            return null;
+        // NOTE: DueDate validation is performed by CreateTaskDtoValidator (so sánh đúng giờ ICT).
+        // Không check trùng ở đây vì dto.DueDate có thể là giờ VN (Unspecified) — so sánh với UtcNow là sai.
 
-        // FE gửi DueDate theo giờ Việt Nam → convert sang UTC trước khi lưu
-        //var dueDateUtc = dto.DueDate.HasValue
-        //    ? VietnamTime.ToUtcFromVietnam(dto.DueDate.Value)
-        //    : (DateTime?)null;
+        // FE gửi DueDate theo giờ Việt Nam → convert sang UTC trước khi lưu.
+        // Validator so sánh với UtcNow nhưng coi DateTimeKind=Unspecified là giờ VN
+        // (validator dùng EnsureUtc + AddHours(-7)) nên giá trị đã vào đây là local VN.
+        // Nếu FE gửi date-only (time = 00:00:00), backend tự set giờ = 17:00 ICT (deadline).
+        DateTime? dueDateUtc = null;
+        if (dto.DueDate.HasValue)
+        {
+            var due = dto.DueDate.Value;
+            if (due.Kind == DateTimeKind.Unspecified && due.TimeOfDay == TimeSpan.Zero)
+            {
+                due = due.Date.AddHours(VietnamTime.DailyDeadlineHour);
+            }
+            dueDateUtc = VietnamTime.ToUtcFromVietnam(due);
+        }
 
         var task = new Model.Task
         {
@@ -99,7 +109,7 @@ public class TaskService : ITaskService
             Title = dto.Title,
             Description = dto.Description,
             RequiredSkillDescription = dto.RequiredSkillDescription,
-            DueDate = dto.DueDate,
+            DueDate = dueDateUtc,
             Status = Model.Enums.TaskStatus.Pending,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
@@ -238,8 +248,8 @@ public class TaskService : ITaskService
         if (!string.IsNullOrEmpty(dto.Title) && dto.Title.Trim().Length < 3)
             return null;
 
-        if (dto.DueDate.HasValue && dto.DueDate.Value < DateTime.UtcNow)
-            return null;
+        // NOTE: DueDate validation is performed by UpdateTaskDtoValidator (so sánh đúng giờ ICT).
+        // Không check trùng ở đây vì dto.DueDate có thể là giờ VN (Unspecified) — so sánh với UtcNow là sai.
 
         // Snapshot trước khi cập nhật để biết có thay đổi field nào đáng báo cho assignee hay không
         var hadImportantChange =
@@ -258,7 +268,16 @@ public class TaskService : ITaskService
         if (dto.Description != null) task.Description = dto.Description;
         if (dto.RequiredSkillDescription != null) task.RequiredSkillDescription = dto.RequiredSkillDescription;
         // FE gửi DueDate theo giờ Việt Nam → convert sang UTC trước khi lưu
-        if (dto.DueDate.HasValue) task.DueDate = VietnamTime.ToUtcFromVietnam(dto.DueDate.Value);
+        if (dto.DueDate.HasValue)
+        {
+            // Nếu FE gửi date-only (time = 00:00:00 + Kind=Unspecified) → mặc định deadline 17:00 ICT.
+            var due = dto.DueDate.Value;
+            if (due.Kind == DateTimeKind.Unspecified && due.TimeOfDay == TimeSpan.Zero)
+            {
+                due = due.Date.AddHours(VietnamTime.DailyDeadlineHour);
+            }
+            task.DueDate = VietnamTime.ToUtcFromVietnam(due);
+        }
         if (!string.IsNullOrEmpty(dto.Status)) task.Status = Enum.TryParse<Model.Enums.TaskStatus>(dto.Status, ignoreCase: true, out var ts) ? ts : task.Status;
         task.UpdatedAt = DateTime.UtcNow;
 
@@ -424,9 +443,10 @@ public class TaskService : ITaskService
             {
                 foreach (var dueDate in dueDates)
                 {
-                    // dueDate là DateOnly theo giờ Việt Nam → convert sang UTC (midnight ICT = 17:00 UTC ngày hôm trước)
-                    var dueDateLocalMidnight = dueDate.ToDateTime(TimeOnly.MinValue);
-                    var dueDateUtc = VietnamTime.ToUtcFromVietnam(dueDateLocalMidnight);
+                    // dueDate là DateOnly theo giờ Việt Nam.
+                    // Deadline mặc định của Task trong ngày = 17:00 ICT = 10:00 UTC cùng ngày.
+                    var dueDateIct1700 = dueDate.ToDateTime(new TimeOnly(17, 0, 0));
+                    var dueDateUtc = VietnamTime.ToUtcFromVietnam(dueDateIct1700);
 
                     var existing = await _taskRepository.GetByBatchAsync(batchId);
                     var alreadyExists = existing.Any(t =>
@@ -581,7 +601,9 @@ public class TaskService : ITaskService
                 SenderId = assignedById,
                 NotificationType = "TaskAssigned",
                 Title = "Bạn có công việc mới",
-                Message = $"Bạn được giao task: {task.Title}. Hạn chót: {task.DueDate:yyyy-MM-dd HH:mm} ICT.",
+                Message = task.DueDate.HasValue
+                    ? $"Bạn được giao task: {task.Title}. Hạn chót: {VietnamTime.ToVietnam(task.DueDate.Value):yyyy-MM-dd HH:mm} ICT."
+                    : $"Bạn được giao task: {task.Title}.",
                 Priority = "High",
                 ReferenceTable = "Task",
                 ReferenceId = task.Id
