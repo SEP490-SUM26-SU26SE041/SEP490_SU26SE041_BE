@@ -441,7 +441,6 @@ public class ExperimentsController : ControllerBase
     [HttpGet("{experimentId:guid}/measurements")]
     public async Task<IActionResult> GetMeasurementsByExperiment(Guid experimentId)
     {
-        if (!await CanAccessExperimentAsync(experimentId)) return Forbid();
         return Ok(ApiResponse<List<MeasurementDefinitionResponseDto>>.Ok(await _measurementService.GetByExperimentAsync(experimentId)));
     }
 
