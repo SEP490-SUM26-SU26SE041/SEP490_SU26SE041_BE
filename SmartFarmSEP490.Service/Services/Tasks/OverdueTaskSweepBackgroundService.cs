@@ -17,8 +17,8 @@ public class OverdueTaskSweepBackgroundService : BackgroundService
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<OverdueTaskSweepBackgroundService> _logger;
 
-    /// <summary>Giờ chạy sweep theo giờ Việt Nam. Mặc định 00:00 ICT (nửa đêm).</summary>
-    public static readonly TimeSpan SweepTimeOfDayVietnam = new(0, 0, 0);
+    /// <summary>Giờ chạy sweep theo giờ Việt Nam. Mặc định 17:01 ICT — 1 phút sau deadline 17:00 ICT (10:00 UTC).</summary>
+    public static readonly TimeSpan SweepTimeOfDayVietnam = new(17, 1, 0);
 
     public OverdueTaskSweepBackgroundService(
         IServiceProvider serviceProvider,
@@ -31,7 +31,7 @@ public class OverdueTaskSweepBackgroundService : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation(
-            "[OverdueSweep] Started. Sweep time = {Time:hh\\:mm} ICT (UTC+7)",
+            "[OverdueSweep] Started. Sweep time = {Time:hh\\:mm} ICT (UTC+7, 1 min after 17:00 deadline)",
             SweepTimeOfDayVietnam);
 
         // Stagger 30s để tránh spike lúc app start

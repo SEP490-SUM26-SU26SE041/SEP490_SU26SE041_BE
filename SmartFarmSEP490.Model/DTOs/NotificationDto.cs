@@ -16,7 +16,10 @@ namespace SmartFarmSEP490.Model.DTOs
         public Guid? ReferenceId { get; set; }
         public bool IsRead { get; set; }
         public DateTime? ReadAt { get; set; }
+        /// <summary>UTC timestamp lưu trong DB.</summary>
         public DateTime CreatedAt { get; set; }
+        /// <summary>ISO-8601 DateTimeOffset theo giờ Việt Nam (UTC+07:00) — FE dùng để hiển thị.</summary>
+        public DateTimeOffset CreatedAtVietnam { get; set; }
     }
 
     public class CreateNotificationDto

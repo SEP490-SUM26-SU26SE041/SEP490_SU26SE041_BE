@@ -1,6 +1,40 @@
 using FluentValidation;
+using System;
 
 namespace SmartFarmSEP490.Model.Validators;
+
+/// <summary>
+/// Convert 1 DateTime (giả định theo giờ VN nếu Kind=Unspecified) sang UTC rồi so sánh với UtcNow.
+/// Validator nằm trong project Model nên không thể reference VietnamTime — tính inline.
+/// ICT = UTC+7, cố định quanh năm (VN không có DST).
+/// </summary>
+internal static class ValidatorTime
+{
+    private const int VietnamUtcOffsetHours = 7;
+
+    public static bool IsNotInPast(DateTime value)
+    {
+        DateTime asUtc = value.Kind switch
+        {
+            DateTimeKind.Utc => value,
+            DateTimeKind.Local => value.ToUniversalTime(),
+            // Kind=Unspecified → mặc định coi như giờ VN, trừ 7h để ra UTC
+            _ => DateTime.SpecifyKind(value.AddHours(-VietnamUtcOffsetHours), DateTimeKind.Utc)
+        };
+        return asUtc >= DateTime.UtcNow;
+    }
+
+    public static bool IsWithinFutureSkew(DateTime value, int skewMinutes)
+    {
+        DateTime asUtc = value.Kind switch
+        {
+            DateTimeKind.Utc => value,
+            DateTimeKind.Local => value.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(value.AddHours(-VietnamUtcOffsetHours), DateTimeKind.Utc)
+        };
+        return asUtc <= DateTime.UtcNow.AddMinutes(skewMinutes);
+    }
+}
 
 public class CreateTaskDtoValidator : AbstractValidator<DTOs.CreateTaskDto>
 {
@@ -18,7 +52,7 @@ public class CreateTaskDtoValidator : AbstractValidator<DTOs.CreateTaskDto>
             .NotEmpty().WithMessage("TaskType is required.");
 
         RuleFor(x => x.DueDate)
-            .Must(d => !d.HasValue || d.Value >= DateTime.UtcNow)
+            .Must(d => !d.HasValue || ValidatorTime.IsNotInPast(d.Value))
             .WithMessage("DueDate cannot be in the past.");
     }
 }
@@ -32,7 +66,7 @@ public class UpdateTaskDtoValidator : AbstractValidator<DTOs.UpdateTaskDto>
             .WithMessage("Title must be at least 3 characters.");
 
         RuleFor(x => x.DueDate)
-            .Must(d => !d.HasValue || d.Value >= DateTime.UtcNow)
+            .Must(d => !d.HasValue || ValidatorTime.IsNotInPast(d.Value))
             .When(x => x.DueDate.HasValue)
             .WithMessage("DueDate cannot be in the past.");
     }
@@ -77,7 +111,7 @@ public class CreateMeasurementRecordDtoValidator : AbstractValidator<DTOs.Create
             .WithMessage("Value must be non-negative.");
 
         RuleFor(x => x.MeasuredAt)
-            .Must(m => !m.HasValue || m.Value <= DateTime.UtcNow.AddMinutes(5))
+            .Must(m => !m.HasValue || ValidatorTime.IsWithinFutureSkew(m.Value, 5))
             .When(x => x.MeasuredAt.HasValue)
             .WithMessage("MeasuredAt cannot be more than 5 minutes in the future.");
     }
@@ -97,7 +131,7 @@ public class UpdateMeasurementRecordDtoValidator : AbstractValidator<DTOs.Update
             .WithMessage("Value must be non-negative.");
 
         RuleFor(x => x.MeasuredAt)
-            .Must(m => !m.HasValue || m.Value <= DateTime.UtcNow.AddMinutes(5))
+            .Must(m => !m.HasValue || ValidatorTime.IsWithinFutureSkew(m.Value, 5))
             .When(x => x.MeasuredAt.HasValue)
             .WithMessage("MeasuredAt cannot be more than 5 minutes in the future.");
     }

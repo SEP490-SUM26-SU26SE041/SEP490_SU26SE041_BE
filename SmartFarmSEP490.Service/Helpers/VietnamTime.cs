@@ -7,16 +7,20 @@ namespace SmartFarmSEP490.Service.Helpers;
 public static class VietnamTime
 {
     public const string VietnamTimeZoneId = "SE Asia Standard Time"; // Windows TZ id, UTC+7
+    public const int VietnamUtcOffsetHours = 7;
+    /// <summary>Deadline mặc định trong ngày cho Task = 17:00 ICT = 10:00 UTC.</summary>
+    public const int DailyDeadlineHour = 17;
     private static readonly TimeZoneInfo VietnamTz = TimeZoneInfo.FindSystemTimeZoneById(VietnamTimeZoneId);
 
     /// <summary>Lấy thời điểm hiện tại theo UTC.</summary>
     public static DateTime NowUtc() => DateTime.UtcNow;
 
-    /// <summary>Convert từ UTC sang giờ Việt Nam.</summary>
+    /// <summary>Convert từ UTC sang giờ Việt Nam. Kết quả Kind=Unspecified để tránh bị hiểu nhầm là Local server TZ.</summary>
     public static DateTime ToVietnam(DateTime utc)
     {
         var ensuredUtc = EnsureUtc(utc);
-        return TimeZoneInfo.ConvertTimeFromUtc(ensuredUtc, VietnamTz);
+        var vietnam = TimeZoneInfo.ConvertTimeFromUtc(ensuredUtc, VietnamTz);
+        return DateTime.SpecifyKind(vietnam, DateTimeKind.Unspecified);
     }
 
     /// <summary>Convert từ giờ Việt Nam sang UTC để lưu DB.</summary>
@@ -31,13 +35,9 @@ public static class VietnamTime
         // Nếu đã là UTC thì trả về
         if (vietnamLocal.Kind == DateTimeKind.Utc) return vietnamLocal;
 
-        // Nếu là Local (server timezone), convert trước rồi mới tính
-        var asUtc = vietnamLocal.Kind == DateTimeKind.Local
-            ? TimeZoneInfo.ConvertTimeToUtc(vietnamLocal)
-            : vietnamLocal;
-
-        var vnFromUtc = TimeZoneInfo.ConvertTimeFromUtc(asUtc, VietnamTz);
-        return TimeZoneInfo.ConvertTimeToUtc(vnFromUtc, VietnamTz);
+        // Kind=Local: ConvertTimeFromUtc ở hàm ToVietnam() đã set Kind=Local nhưng giá trị vẫn là giờ VN.
+        // Ta coi đây vẫn là giờ VN, chỉ cần trừ 7h để ra UTC — bất kể server TZ là gì.
+        return DateTime.SpecifyKind(vietnamLocal.AddHours(-7), DateTimeKind.Utc);
     }
 
     /// <summary>Chuẩn hóa 1 DateTime về UTC. Nếu Kind=Unspecified thì coi như đã là UTC.</summary>

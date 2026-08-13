@@ -5,6 +5,7 @@ using SmartFarmSEP490.Model.DTOs;
 using SmartFarmSEP490.Model.Entities;
 using SmartFarmSEP490.Model.Enums;
 using SmartFarmSEP490.Repository.Interfaces.Notifications;
+using SmartFarmSEP490.Service.Helpers;
 using SmartFarmSEP490.Service.Interfaces.Notifications;
 using SmartFarmSEP490.Service.WebSockets;
 
@@ -55,7 +56,8 @@ namespace SmartFarmSEP490.Service.Services.Notifications
                 IsRead = notification.IsRead,
                 ReferenceTable = notification.ReferenceTable,
                 ReferenceId = notification.ReferenceId,
-                CreatedAt = notification.CreatedAt
+                CreatedAt = notification.CreatedAt,
+                CreatedAtVietnam = VietnamTime.ToVietnamOffset(notification.CreatedAt)
             };
 
             // Push realtime tới mọi WebSocket connection đang mở của user
@@ -74,10 +76,10 @@ namespace SmartFarmSEP490.Service.Services.Notifications
         public async Task<PaginatedList<NotificationDto>> GetUserNotificationsAsync(Guid userId, int pageNumber, int pageSize)
         {
             int skip = (pageNumber - 1) * pageSize;
-            
+
             var notifications = await _notificationRepository.GetUserNotificationsAsync(userId, skip, pageSize);
             var totalCount = await _notificationRepository.GetTotalCountAsync(userId);
-            
+
             var dtoList = notifications.Select(n => new NotificationDto
             {
                 Id = n.Id,
@@ -91,7 +93,8 @@ namespace SmartFarmSEP490.Service.Services.Notifications
                 ReadAt = n.ReadAt,
                 ReferenceTable = n.ReferenceTable,
                 ReferenceId = n.ReferenceId,
-                CreatedAt = n.CreatedAt
+                CreatedAt = n.CreatedAt,
+                CreatedAtVietnam = VietnamTime.ToVietnamOffset(n.CreatedAt)
             }).ToList();
 
             return new PaginatedList<NotificationDto>(dtoList, totalCount, pageNumber, pageSize);

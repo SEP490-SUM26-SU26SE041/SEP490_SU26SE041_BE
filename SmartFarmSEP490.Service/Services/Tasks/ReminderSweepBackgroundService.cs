@@ -14,8 +14,8 @@ public class ReminderSweepBackgroundService : BackgroundService
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<ReminderSweepBackgroundService> _logger;
 
-    /// <summary>Giờ chạy reminder theo giờ Việt Nam (UTC+7). Mặc định 16:30.</summary>
-    public static readonly TimeSpan ReminderTimeOfDayVietnam = new(16, 30, 0);
+    /// <summary>Giờ chạy reminder theo giờ Việt Nam (UTC+7). Mặc định 16:00 ICT — 1 giờ trước deadline 17:00 ICT.</summary>
+    public static readonly TimeSpan ReminderTimeOfDayVietnam = new(16, 0, 0);
 
     public ReminderSweepBackgroundService(
         IServiceProvider serviceProvider,
@@ -28,7 +28,7 @@ public class ReminderSweepBackgroundService : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation(
-            "[ReminderSweep] Started. Reminder time = {Time:hh\\:mm} ICT (UTC+7)",
+            "[ReminderSweep] Started. Reminder time = {Time:hh\\:mm} ICT (UTC+7, 1h before 17:00 deadline)",
             ReminderTimeOfDayVietnam);
 
         // Stagger 30s sau khi start

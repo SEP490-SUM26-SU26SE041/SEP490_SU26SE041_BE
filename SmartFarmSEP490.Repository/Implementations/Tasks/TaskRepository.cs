@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using SmartFarmSEP490.Model;
 using SmartFarmSEP490.Model.DTOs;
 using SmartFarmSEP490.Repository.DbContexts;
+using SmartFarmSEP490.Repository.Helpers;
 using SmartFarmSEP490.Repository.Interfaces.Tasks;
 using Task = System.Threading.Tasks.Task;
 using TaskStatus = SmartFarmSEP490.Model.Enums.TaskStatus;
@@ -100,25 +101,26 @@ public class TaskRepository : ITaskRepository
 
     public async Task<List<Model.Task>> GetTodayTasksAsync(Guid assigneeId)
     {
-        var today = DateTime.UtcNow.Date;
-        var tomorrow = today.AddDays(1);
+        // Cửa sổ "hôm nay" theo ICT giờ làm việc: [00:00 → 17:00 ICT].
+        // DueDate được lưu UTC; convert 17:00 ICT → 10:00 UTC cùng ngày.
+        var (startUtc, endUtc) = VietnamTimeHelper.GetVietnamWorkdayWindowUtc();
         return await FullQuery()
             .Where(t => t.AssignedTo == assigneeId
                 && t.DueDate.HasValue
-                && t.DueDate.Value >= today
-                && t.DueDate.Value < tomorrow)
+                && t.DueDate.Value >= startUtc
+                && t.DueDate.Value < endUtc)
             .OrderBy(t => t.DueDate)
             .ToListAsync();
     }
 
     public async Task<List<Model.Task>> GetUpcomingTasksAsync(Guid assigneeId, int days)
     {
-        var today = DateTime.UtcNow.Date;
-        var future = today.AddDays(days);
+        var (todayIctStart, _) = VietnamTimeHelper.GetVietnamDayWindowUtc();
+        var future = todayIctStart.AddDays(days);
         return await FullQuery()
             .Where(t => t.AssignedTo == assigneeId
                 && t.DueDate.HasValue
-                && t.DueDate.Value >= today
+                && t.DueDate.Value >= todayIctStart
                 && t.DueDate.Value <= future)
             .OrderBy(t => t.DueDate)
             .ToListAsync();
@@ -142,10 +144,9 @@ public class TaskRepository : ITaskRepository
         var completedStatus = SmartFarmSEP490.Model.Enums.TaskStatus.Completed;
         var cancelledStatus = SmartFarmSEP490.Model.Enums.TaskStatus.Cancelled;
         var now = DateTime.UtcNow;
-        var today = now.Date;
-        var tomorrow = today.AddDays(1);
+        var (todayIctStart, tomorrowIctStart) = VietnamTimeHelper.GetVietnamDayWindowUtc(now);
         var upcomingDays = filter.UpcomingDays ?? 7;
-        var future = today.AddDays(upcomingDays);
+        var future = todayIctStart.AddDays(upcomingDays);
 
         var query = FullQuery().Where(t => t.CreatedBy == filter.CreatorId);
 
@@ -164,15 +165,19 @@ public class TaskRepository : ITaskRepository
                 break;
 
             case TaskFilterScope.Today:
+                // Cửa sổ "hôm nay" theo ICT giờ làm việc: [00:00 → 17:00 ICT] = [00:00 → 10:00 UTC cùng ngày ICT].
+                // Dùng helper chung để tránh lệch logic giữa các query.
+                var (todayWorkStart, todayWorkEnd) = VietnamTimeHelper.GetVietnamWorkdayWindowUtc(now);
                 query = query.Where(t => t.DueDate.HasValue
-                    && t.DueDate.Value >= today
-                    && t.DueDate.Value < tomorrow);
+                    && t.DueDate.Value >= todayWorkStart
+                    && t.DueDate.Value < todayWorkEnd);
                 query = query.OrderBy(t => t.DueDate);
                 break;
 
             case TaskFilterScope.Upcoming:
+                // "Sắp tới" tính từ 00:00 ICT ngày mai.
                 query = query.Where(t => t.DueDate.HasValue
-                    && t.DueDate.Value >= tomorrow
+                    && t.DueDate.Value >= tomorrowIctStart
                     && t.DueDate.Value <= future);
                 query = query.OrderBy(t => t.DueDate);
                 break;
