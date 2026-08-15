@@ -6,6 +6,7 @@ namespace SmartFarmSEP490.Repository.Interfaces.Skills;
 public interface IUserSkillRepository
 {
     Task<(Guid UserId, Guid SkillId)?> GetKeyAsync(Guid userId, Guid skillId);
+    Task<bool> ExistsAsync(Guid userId, Guid skillId);
     Task<M.UserSkill?> GetByKeyAsync(Guid userId, Guid skillId);
     Task<List<M.UserSkill>> GetAllAsync();
     Task<List<M.UserSkill>> GetByUserAsync(Guid userId);
