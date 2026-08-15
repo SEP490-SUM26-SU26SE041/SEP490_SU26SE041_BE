@@ -5,7 +5,7 @@ using SmartFarmSEP490.Model.DTOs;
 using SmartFarmSEP490.Model.Entities;
 using SmartFarmSEP490.Model.Enums;
 using SmartFarmSEP490.Repository.Interfaces.Notifications;
-using SmartFarmSEP490.Service.Helpers;
+using SmartFarmSEP490.Model.Helpers;
 using SmartFarmSEP490.Service.Interfaces.Notifications;
 using SmartFarmSEP490.Service.WebSockets;
 

@@ -1,5 +1,5 @@
 using SmartFarmSEP490.Repository.Interfaces.Tasks;
-using SmartFarmSEP490.Service.Helpers;
+using SmartFarmSEP490.Model.Helpers;
 using SmartFarmSEP490.Service.Interfaces.Notifications;
 
 namespace SmartFarmSEP490.Service.Services.Tasks;

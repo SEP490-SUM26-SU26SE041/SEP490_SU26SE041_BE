@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Http;
 
-namespace SmartFarmSEP490.API.Dtos;
+namespace SmartFarmSEP490.Model.DTOs;
 
 public class UploadTaskImageForm
 {

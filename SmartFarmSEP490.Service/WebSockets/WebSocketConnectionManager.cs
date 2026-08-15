@@ -3,6 +3,7 @@ using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
+using SmartFarmSEP490.Model.Helpers;
 
 namespace SmartFarmSEP490.Service.WebSockets;
 
@@ -56,7 +57,7 @@ public class WebSocketConnectionManager : IWebSocketConnectionManager
             // UTC ISO string cho backend consumer
             ts = DateTime.UtcNow,
             // ISO-8601 offset +07:00 cho FE hiển thị real-time
-            tsVietnam = SmartFarmSEP490.Service.Helpers.VietnamTime.ToVietnamOffset(DateTime.UtcNow)
+            tsVietnam = VietnamTime.ToVietnamOffset(DateTime.UtcNow)
         };
         var json = JsonSerializer.Serialize(envelope, JsonOptions);
         var bytes = Encoding.UTF8.GetBytes(json);

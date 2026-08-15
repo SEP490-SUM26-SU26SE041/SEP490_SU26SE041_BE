@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using SmartFarmSEP490.Model.DTOs;
 using SmartFarmSEP490.Repository.Interfaces.Experiments;
+using SmartFarmSEP490.Service.Interfaces.Skills;
 using SmartFarmSEP490.Service.Interfaces.Tasks;
 
 namespace SmartFarmSEP490.API.Controllers;
@@ -16,17 +17,20 @@ public class TasksController : ControllerBase
     private readonly ITaskService _taskService;
     private readonly IExperimentRepository _experimentRepository;
     private readonly IOverdueTaskService _overdueTaskService;
+    private readonly ITaskCountService _taskCountService;
     private readonly ILogger<TasksController> _logger;
 
     public TasksController(
         ITaskService taskService,
         IExperimentRepository experimentRepository,
         IOverdueTaskService overdueTaskService,
+        ITaskCountService taskCountService,
         ILogger<TasksController> logger)
     {
         _taskService = taskService;
         _experimentRepository = experimentRepository;
         _overdueTaskService = overdueTaskService;
+        _taskCountService = taskCountService;
         _logger = logger;
     }
 
@@ -427,6 +431,32 @@ public class TasksController : ControllerBase
     }
 
     // ========== Admin / Debug ==========
+
+    /// <summary>
+    /// Đếm số Task của mỗi Technician / Student trong 1 ngày cụ thể.
+    /// FE truyền ?date=2026-08-13 (yyyy-MM-dd, local ICT). Có thể truyền ?roles=Technician,Student.
+    /// Mặc định lọc cả 2 role: Technician, Student.
+    /// Window: [00:00 ICT ngày đó, 00:00 ICT ngày hôm sau).
+    /// Researcher only — Researcher cần xem để phân công task cho Technician / Student hợp lý.
+    /// </summary>
+    [HttpGet("count-by-user")]
+    [Authorize(Roles = "Researcher")]
+    public async Task<IActionResult> CountTasksByUser(
+        [FromQuery] DateOnly? date,
+        [FromQuery] string? roles,
+        CancellationToken ct)
+    {
+        var targetDate = date ?? DateOnly.FromDateTime(
+            TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow,
+                TimeZoneInfo.FindSystemTimeZoneById(Model.Helpers.VietnamTime.VietnamTimeZoneId)));
+
+        var roleList = string.IsNullOrWhiteSpace(roles)
+            ? (IReadOnlyCollection<string>?)null
+            : roles.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        var report = await _taskCountService.GetDailyCountByRoleAsync(roleList!, targetDate, ct);
+        return Ok(report);
+    }
 
     /// <summary>
     /// Trigger manual sweep over (DueDate &lt; now UTC) → Overdue.

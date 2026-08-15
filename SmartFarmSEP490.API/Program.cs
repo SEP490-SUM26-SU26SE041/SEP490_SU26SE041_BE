@@ -185,6 +185,18 @@ builder.Services.AddHostedService<OverdueTaskSweepBackgroundService>();
 builder.Services.AddScoped<IReminderTaskService, ReminderTaskService>();
 builder.Services.AddHostedService<ReminderSweepBackgroundService>();
 
+// Skills / UserSkills / Task Count
+builder.Services.AddScoped<SmartFarmSEP490.Repository.Interfaces.Skills.ISkillRepository,
+                          SmartFarmSEP490.Repository.Implementations.Skills.SkillRepository>();
+builder.Services.AddScoped<SmartFarmSEP490.Repository.Interfaces.Skills.IUserSkillRepository,
+                          SmartFarmSEP490.Repository.Implementations.Skills.UserSkillRepository>();
+builder.Services.AddScoped<SmartFarmSEP490.Service.Interfaces.Skills.ISkillService,
+                          SmartFarmSEP490.Service.Services.Skills.SkillService>();
+builder.Services.AddScoped<SmartFarmSEP490.Service.Interfaces.Skills.IUserSkillService,
+                          SmartFarmSEP490.Service.Services.Skills.UserSkillService>();
+builder.Services.AddScoped<SmartFarmSEP490.Service.Interfaces.Skills.ITaskCountService,
+                          SmartFarmSEP490.Service.Services.Skills.TaskCountService>();
+
 var jwtSettings = builder.Configuration.GetSection("Jwt");
 var key = Encoding.UTF8.GetBytes(jwtSettings["Key"]!);
 

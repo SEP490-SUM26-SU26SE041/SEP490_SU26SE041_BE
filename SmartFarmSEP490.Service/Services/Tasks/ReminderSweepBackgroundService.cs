@@ -1,7 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using SmartFarmSEP490.Service.Helpers;
+using SmartFarmSEP490.Model.Helpers;
 
 namespace SmartFarmSEP490.Service.Services.Tasks;
 
