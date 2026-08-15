@@ -11,11 +11,15 @@ public class UserSkillRepository : IUserSkillRepository
     private readonly SmartFarmDbContext _context;
     public UserSkillRepository(SmartFarmDbContext context) => _context = context;
 
-    public async Task<(Guid UserId, Guid SkillId)?> GetKeyAsync(Guid userId, Guid skillId) =>
+    public async Task<bool> ExistsAsync(Guid userId, Guid skillId) =>
         await _context.UserSkills
-            .Where(us => us.UserId == userId && us.SkillId == skillId)
-            .Select(us => new ValueTuple<Guid, Guid>(us.UserId, us.SkillId))
-            .FirstOrDefaultAsync();
+            .AnyAsync(us => us.UserId == userId && us.SkillId == skillId);
+
+    public async Task<(Guid UserId, Guid SkillId)?> GetKeyAsync(Guid userId, Guid skillId)
+    {
+        var exists = await ExistsAsync(userId, skillId);
+        return exists ? new ValueTuple<Guid, Guid>(userId, skillId) : null;
+    }
 
     public async Task<M.UserSkill?> GetByKeyAsync(Guid userId, Guid skillId) =>
         await _context.UserSkills
