@@ -29,4 +29,19 @@ public interface ITaskRepository
 
     // Reminder: task chưa hoàn thành có DueDate trong ngày [dayStartUtc, dayEndUtc)
     Task<List<Model.Task>> GetActiveTasksDueOnDayAsync(DateTime dayStartUtc, DateTime dayEndUtc, CancellationToken ct = default);
+
+    // Count task theo user cho Admin report (filter theo role + khoảng thời gian)
+    Task<List<TaskCountByUserRow>> CountTasksByUserAsync(
+        IReadOnlyCollection<string> roleNames,
+        DateTime startUtc,
+        DateTime endUtc,
+        CancellationToken ct = default);
+}
+
+/// <summary>Row thô cho report count task theo user (group by UserId + Status).</summary>
+public class TaskCountByUserRow
+{
+    public Guid UserId { get; set; }
+    public int Status { get; set; } // SmartFarmSEP490.Model.Enums.TaskStatus value
+    public int Count { get; set; }
 }

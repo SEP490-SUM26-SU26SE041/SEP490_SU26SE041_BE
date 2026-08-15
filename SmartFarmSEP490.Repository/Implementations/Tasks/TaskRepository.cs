@@ -1,8 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using SmartFarmSEP490.Model;
 using SmartFarmSEP490.Model.DTOs;
+using SmartFarmSEP490.Model.Helpers;
 using SmartFarmSEP490.Repository.DbContexts;
-using SmartFarmSEP490.Repository.Helpers;
 using SmartFarmSEP490.Repository.Interfaces.Tasks;
 using Task = System.Threading.Tasks.Task;
 using TaskStatus = SmartFarmSEP490.Model.Enums.TaskStatus;
@@ -103,7 +103,7 @@ public class TaskRepository : ITaskRepository
     {
         // Cửa sổ "hôm nay" theo ICT giờ làm việc: [00:00 → 17:00 ICT].
         // DueDate được lưu UTC; convert 17:00 ICT → 10:00 UTC cùng ngày.
-        var (startUtc, endUtc) = VietnamTimeHelper.GetVietnamWorkdayWindowUtc();
+        var (startUtc, endUtc) = VietnamTime.GetVietnamWorkdayWindowUtc();
         return await FullQuery()
             .Where(t => t.AssignedTo == assigneeId
                 && t.DueDate.HasValue
@@ -115,7 +115,7 @@ public class TaskRepository : ITaskRepository
 
     public async Task<List<Model.Task>> GetUpcomingTasksAsync(Guid assigneeId, int days)
     {
-        var (todayIctStart, _) = VietnamTimeHelper.GetVietnamDayWindowUtc();
+        var (todayIctStart, _) = VietnamTime.GetVietnamDayWindowUtc();
         var future = todayIctStart.AddDays(days);
         return await FullQuery()
             .Where(t => t.AssignedTo == assigneeId
@@ -144,7 +144,7 @@ public class TaskRepository : ITaskRepository
         var completedStatus = SmartFarmSEP490.Model.Enums.TaskStatus.Completed;
         var cancelledStatus = SmartFarmSEP490.Model.Enums.TaskStatus.Cancelled;
         var now = DateTime.UtcNow;
-        var (todayIctStart, tomorrowIctStart) = VietnamTimeHelper.GetVietnamDayWindowUtc(now);
+        var (todayIctStart, tomorrowIctStart) = VietnamTime.GetVietnamDayWindowUtc(now);
         var upcomingDays = filter.UpcomingDays ?? 7;
         var future = todayIctStart.AddDays(upcomingDays);
 
@@ -167,7 +167,7 @@ public class TaskRepository : ITaskRepository
             case TaskFilterScope.Today:
                 // Cửa sổ "hôm nay" theo ICT giờ làm việc: [00:00 → 17:00 ICT] = [00:00 → 10:00 UTC cùng ngày ICT].
                 // Dùng helper chung để tránh lệch logic giữa các query.
-                var (todayWorkStart, todayWorkEnd) = VietnamTimeHelper.GetVietnamWorkdayWindowUtc(now);
+                var (todayWorkStart, todayWorkEnd) = VietnamTime.GetVietnamWorkdayWindowUtc(now);
                 query = query.Where(t => t.DueDate.HasValue
                     && t.DueDate.Value >= todayWorkStart
                     && t.DueDate.Value < todayWorkEnd);
@@ -249,5 +249,48 @@ public class TaskRepository : ITaskRepository
                      && (t.Status == TaskStatus.Pending || t.Status == TaskStatus.InProgress))
             .OrderBy(t => t.DueDate)
             .ToListAsync(ct);
+    }
+
+    public async Task<List<TaskCountByUserRow>> CountTasksByUserAsync(
+        IReadOnlyCollection<string> roleNames,
+        DateTime startUtc,
+        DateTime endUtc,
+        CancellationToken ct = default)
+    {
+        if (roleNames == null || roleNames.Count == 0)
+            return new List<TaskCountByUserRow>();
+
+        // Single GROUP BY query: AssignedTo + Status trong cùng 1 SQL round-trip.
+        // Lưu ý: Postgres enum không cast trực tiếp sang int, nên phải cast qua text trước:
+        //   CAST(t."Status" AS text) -> đối chiếu trong CASE -> ép về int.
+        // Dùng client-side mapping (PostgresValueGenerationStrategy.None) sẽ gây lỗi nếu dùng
+        // EF Translate; ta nhóm theo status string rồi map lại int trong bộ nhớ.
+        var grouped = await _context.Tasks
+            .AsNoTracking()
+            .Where(t => t.AssignedTo != null
+                     && t.DueDate != null
+                     && t.DueDate >= startUtc
+                     && t.DueDate < endUtc
+                     && _context.UserRoles
+                         .Where(ur => ur.UserId == t.AssignedTo
+                                   && roleNames.Contains(ur.Role.RoleName))
+                         .Any())
+            .GroupBy(t => new { t.AssignedTo, t.Status })
+            .Select(g => new
+            {
+                UserId = g.Key.AssignedTo!.Value,
+                Status = g.Key.Status,
+                Count = g.Count()
+            })
+            .ToListAsync(ct);
+
+        return grouped
+            .Select(g => new TaskCountByUserRow
+            {
+                UserId = g.UserId,
+                Status = (int)g.Status,
+                Count = g.Count
+            })
+            .ToList();
     }
 }

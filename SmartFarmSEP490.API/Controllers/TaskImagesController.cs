@@ -1,7 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using SmartFarmSEP490.API.Dtos;
+using SmartFarmSEP490.Model.DTOs;
 using SmartFarmSEP490.Service.Interfaces.Tasks;
 
 namespace SmartFarmSEP490.API.Controllers;

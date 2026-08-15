@@ -9,7 +9,7 @@ using SmartFarmSEP490.Repository.Interfaces.CareSchedules;
 using SmartFarmSEP490.Repository.Interfaces.ExperimentStages;
 using SmartFarmSEP490.Repository.Interfaces.Experiments;
 using SmartFarmSEP490.Repository.Interfaces.Tasks;
-using SmartFarmSEP490.Service.Helpers;
+using SmartFarmSEP490.Model.Helpers;
 using SmartFarmSEP490.Service.Interfaces.Notifications;
 using SmartFarmSEP490.Service.Interfaces.Tasks;
 using SmartFarmSEP490.Service.WebSockets;
