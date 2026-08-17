@@ -7,15 +7,15 @@ namespace SmartFarmSEP490.Service.Services.Tasks;
 
 /// <summary>
 /// BackgroundService nhắc nhở các task chưa hoàn thành có DueDate trong ngày.
-/// Mặc định chạy lúc 16:30 ICT (UTC+7) hằng ngày — trước thời điểm overdue sweep 17:00.
+/// Mặc định chạy lúc 20:15 ICT (UTC+7) hằng ngày — trước thời điểm overdue sweep 17:00 ICT ngày hôm sau.
 /// </summary>
 public class ReminderSweepBackgroundService : BackgroundService
 {
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<ReminderSweepBackgroundService> _logger;
 
-    /// <summary>Giờ chạy reminder theo giờ Việt Nam (UTC+7). Mặc định 16:00 ICT — 1 giờ trước deadline 17:00 ICT.</summary>
-    public static readonly TimeSpan ReminderTimeOfDayVietnam = new(16, 0, 0);
+    /// <summary>Giờ chạy reminder theo giờ Việt Nam (UTC+7). Mặc định 17:00 ICT.</summary>
+    public static readonly TimeSpan ReminderTimeOfDayVietnam = new(17, 0, 0);// có thể giao sau 17h due date
 
     public ReminderSweepBackgroundService(
         IServiceProvider serviceProvider,
@@ -28,7 +28,7 @@ public class ReminderSweepBackgroundService : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation(
-            "[ReminderSweep] Started. Reminder time = {Time:hh\\:mm} ICT (UTC+7, 1h before 17:00 deadline)",
+            "[ReminderSweep] Started. Reminder time = {Time:hh\\:mm} ICT (UTC+7)",
             ReminderTimeOfDayVietnam);
 
         // Stagger 30s sau khi start

@@ -181,7 +181,7 @@ builder.Services.AddScoped<IReportExportService, ReportExportService>();
 builder.Services.AddScoped<IOverdueTaskService, OverdueTaskService>();
 builder.Services.AddHostedService<OverdueTaskSweepBackgroundService>();
 
-// Reminder: nhắc nhở 16:30 ICT hằng ngày task chưa hoàn thành trong ngày
+// Reminder: nhắc nhở hằng ngày task chưa hoàn thành trong ngày
 builder.Services.AddScoped<IReminderTaskService, ReminderTaskService>();
 builder.Services.AddHostedService<ReminderSweepBackgroundService>();
 

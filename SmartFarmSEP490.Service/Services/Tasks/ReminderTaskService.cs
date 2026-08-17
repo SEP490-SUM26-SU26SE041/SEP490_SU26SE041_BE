@@ -28,12 +28,13 @@ public class ReminderTaskService : IReminderTaskService
 
     public async Task<int> SendDailyReminderAsync(CancellationToken ct = default)
     {
-        // Cửa sổ "task hôm nay" theo ICT giờ làm việc: [00:00 → 17:00 ICT] = [00:00 → 10:00 UTC cùng ngày].
-        // Reminder chạy lúc 16:00 ICT nên tất cả task due trong cửa sổ này (kể cả đã qua giờ nhắc) đều nhận được.
+        // Cửa sổ "task hôm nay" theo ICT: lấy cả ngày [00:00 → 23:59:59 ICT] = [17:00 hôm trước → 17:00 hôm sau UTC).
+        // Lý do cũ: trước đây giới hạn tới 17:00 ICT (VietnamTime.DailyDeadlineHour) nhưng làm task có deadline
+        // sau 17:00 ICT (vd 22:00) bị bỏ sót — task đó sẽ không bao giờ nhận được NotificationType = TaskReminder.
         var nowUtc = VietnamTime.NowUtc();
         var nowVietnam = VietnamTime.ToVietnam(nowUtc);
         var dayStartVietnam = nowVietnam.Date;
-        var dayEndVietnam = dayStartVietnam.Date.AddHours(VietnamTime.DailyDeadlineHour); // 17:00 ICT hôm nay
+        var dayEndVietnam = dayStartVietnam.Date.AddDays(1); // 00:00 ICT ngày hôm sau
 
         var dayStartUtc = VietnamTime.ToUtcFromVietnam(dayStartVietnam);
         var dayEndUtc = VietnamTime.ToUtcFromVietnam(dayEndVietnam);
