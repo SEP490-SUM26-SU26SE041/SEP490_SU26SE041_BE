@@ -15,7 +15,7 @@ public class ReminderSweepBackgroundService : BackgroundService
     private readonly ILogger<ReminderSweepBackgroundService> _logger;
 
     /// <summary>Giờ chạy reminder theo giờ Việt Nam (UTC+7). Mặc định 17:00 ICT.</summary>
-    public static readonly TimeSpan ReminderTimeOfDayVietnam = new(17, 0, 0);// có thể giao sau 17h due date
+    public static readonly TimeSpan ReminderTimeOfDayVietnam = new(16, 0, 0);// có thể giao sau 17h due date
 
     public ReminderSweepBackgroundService(
         IServiceProvider serviceProvider,

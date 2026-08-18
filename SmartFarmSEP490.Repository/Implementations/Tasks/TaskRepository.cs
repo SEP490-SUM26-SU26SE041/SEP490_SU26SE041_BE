@@ -101,9 +101,9 @@ public class TaskRepository : ITaskRepository
 
     public async Task<List<Model.Task>> GetTodayTasksAsync(Guid assigneeId)
     {
-        // Cửa sổ "hôm nay" theo ICT giờ làm việc: [00:00 → 17:00 ICT].
-        // DueDate được lưu UTC; convert 17:00 ICT → 10:00 UTC cùng ngày.
-        var (startUtc, endUtc) = VietnamTime.GetVietnamWorkdayWindowUtc();
+        // Cửa sổ "task hôm nay" theo ICT: [00:00 ICT → 00:00 ICT ngày mai).
+        // Dùng GetVietnamDayWindowUtc (full day) để khớp với cửa sổ trong SendDailyReminderAsync.
+        var (startUtc, endUtc) = VietnamTime.GetVietnamDayWindowUtc();
         return await FullQuery()
             .Where(t => t.AssignedTo == assigneeId
                 && t.DueDate.HasValue
