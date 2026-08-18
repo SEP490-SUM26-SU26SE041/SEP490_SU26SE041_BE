@@ -112,6 +112,7 @@ public class TaskReportService : ITaskReportService
             Id = report.Id,
             TaskId = report.TaskId,
             TaskTitle = report.Task?.Title,
+            TaskType = report.Task?.Type.ToString(),
             ReporterId = report.ReporterId,
             ReporterName = report.Reporter?.FullName,
             ReportText = report.ReportText,

@@ -88,6 +88,7 @@ public class TaskReportResponseDto
     public Guid Id { get; set; }
     public Guid TaskId { get; set; }
     public string? TaskTitle { get; set; }
+    public string? TaskType { get; set; }
     public Guid ReporterId { get; set; }
     public string? ReporterName { get; set; }
     public string? ReportText { get; set; }
