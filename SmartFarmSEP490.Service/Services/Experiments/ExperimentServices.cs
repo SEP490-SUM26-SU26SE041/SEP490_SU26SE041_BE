@@ -52,6 +52,7 @@ public class ExperimentService : IExperimentService
 
     public async Task<ExperimentResponseDto?> CreateAsync(CreateExperimentDto dto, Guid researcherId)
     {
+        await using var tx = await _context.Database.BeginTransactionAsync();
         try
         {
             if (dto.RequestId.HasValue)
@@ -98,39 +99,28 @@ public class ExperimentService : IExperimentService
                         })
                         .ToList();
                     var result = await _experimentRepository.CreateWithStagesAsync(entity, stages);
-                    if (dto.RequestId.HasValue)
-                        await _bedAssignmentRepository.AssignBedsToExperimentAsync(dto.RequestId.Value, result.Id);
                     createdId = result.Id;
                 }
                 else
                 {
                     var resultOnly = await _experimentRepository.CreateAsync(entity);
-                    if (dto.RequestId.HasValue)
-                        await _bedAssignmentRepository.AssignBedsToExperimentAsync(dto.RequestId.Value, resultOnly.Id);
                     createdId = resultOnly.Id;
                 }
             }
             else
             {
                 var resultOnly = await _experimentRepository.CreateAsync(entity);
-                if (dto.RequestId.HasValue)
-                    await _bedAssignmentRepository.AssignBedsToExperimentAsync(dto.RequestId.Value, resultOnly.Id);
                 createdId = resultOnly.Id;
             }
 
-            try
-            {
-                await AutoSetupExperimentStructureAsync(createdId);
-            }
-            catch
-            {
-                // Auto-setup that bai thi van giu experiment, nguoi dung co the goi thu cong
-            }
+            if (dto.RequestId.HasValue)
+                await _bedAssignmentRepository.AssignBedsToExperimentAsync(dto.RequestId.Value, createdId);
 
+            await tx.CommitAsync();
             return await GetByIdAsync(createdId);
         }
-        catch (InvalidOperationException) { throw; }
-        catch (Exception ex) { throw new Exception($"Tao thuc nghiem that bai: {ex.InnerException?.Message ?? ex.Message}", ex); }
+        catch (InvalidOperationException) { await tx.RollbackAsync(); throw; }
+        catch (Exception ex) { await tx.RollbackAsync(); throw new Exception($"Tao thuc nghiem that bai: {ex.InnerException?.Message ?? ex.Message}", ex); }
     }
 
     public async Task<ExperimentResponseDto?> CreateFromRequestAsync(Guid requestId, Guid researcherId)

@@ -462,6 +462,7 @@ appsettings.json
 # appsettings.Production.json
 # appsettings.*.
 
+# md file
 API-TESTING-SPEC.md
 API_TESTING_SPEC.md
 SPEC.md
@@ -469,3 +470,8 @@ delete_block.md
 VALIDATION.md
 MeasurementStatistics.md
 System-Documentation.md
+System-User-Roles-Authorization.md
+System-User-Roles.md
+
+# folder
+test/
