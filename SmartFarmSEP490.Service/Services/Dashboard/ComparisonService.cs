@@ -38,7 +38,7 @@ public class ComparisonService : IComparisonService
         if (experiment == null) return null;
 
         var groups = (await _groupRepository.GetByExperimentAsync(experimentId)).ToList();
-        var batches = _context.Batches.Where(b => b.ExperimentId == experimentId).ToList();
+        var batches = _context.Batches.Where(b => b.ExperimentId == experimentId && b.DeletedAt == null).ToList();
         var design = _context.ExperimentDesigns.FirstOrDefault(d => d.ExperimentId == experimentId);
         var measurementDefs = _context.MeasurementDefinitions.Where(m => m.ExperimentId == experimentId).ToList();
 
@@ -48,8 +48,15 @@ public class ComparisonService : IComparisonService
         {
             var groupBatches = batches.Where(b => b.GroupId == group.Id).ToList();
             var batchIds = groupBatches.Select(b => b.Id).ToList();
-            var measurements = _context.MeasurementRecords.Where(m => batchIds.Contains(m.BatchId)).ToList();
-            var groupMetricDefs = measurementDefs.Where(m => m.GroupId == group.Id).ToList();
+            var measurements = _context.MeasurementRecords
+                .Where(m => batchIds.Contains(m.BatchId) && m.DeletedAt == null)
+                .ToList();
+
+            // Use ALL measurement definitions for the experiment, not just group-specific ones.
+            // Shared definitions (GroupId = null) apply to every group.
+            var groupMetricDefs = measurementDefs
+                .Where(m => m.GroupId == null || m.GroupId == group.Id)
+                .ToList();
 
             var metricComparisons = new List<MetricComparisonDto>();
 
@@ -89,6 +96,14 @@ public class ComparisonService : IComparisonService
                         : 0
                 });
             }
+
+            // Deduplicate by MetricName — keep the first occurrence for each metric name.
+            // This handles cases where multiple MeasurementDefinition rows share the same MetricName
+            // but differ in TargetValue or Unit (e.g. per-group definitions for the same metric).
+            var seenMetricNames = new HashSet<string>();
+            metricComparisons = metricComparisons
+                .Where(mc => seenMetricNames.Add(mc.MetricName))
+                .ToList();
 
             var nonNullValues = measurements.Where(m => m.Value.HasValue).Select(m => m.Value!.Value).ToList();
             var statistics = CalculateStatistics(nonNullValues);
