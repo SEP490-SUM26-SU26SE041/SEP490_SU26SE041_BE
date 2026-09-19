@@ -171,4 +171,12 @@ public class PlantImageResponseDto
     public string? UploadedByName { get; set; }
     public DateTime? CapturedAt { get; set; }
     public DateTime CreatedAt { get; set; }
+
+    // ---- AI fields ----
+    public string AIStatus { get; set; } = "Pending";
+    public string? AIProvider { get; set; }
+    public string? AIPredictedLabel { get; set; }
+    public decimal? AIConfidence { get; set; }
+    public decimal? AIConfidenceRate { get; set; }
+    public string? AIAnnotatedImageUrl { get; set; }
 }

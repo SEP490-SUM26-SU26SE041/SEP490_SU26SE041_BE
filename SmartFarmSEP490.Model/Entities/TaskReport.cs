@@ -19,6 +19,8 @@ public partial class TaskReport
 
     public virtual ICollection<PlantImage> PlantImages { get; set; } = new List<PlantImage>();
 
+    public virtual ICollection<AIAnalysis> AIAnalyses { get; set; } = new List<AIAnalysis>();
+
     public virtual User Reporter { get; set; } = null!;
 
     public virtual Task Task { get; set; } = null!;
