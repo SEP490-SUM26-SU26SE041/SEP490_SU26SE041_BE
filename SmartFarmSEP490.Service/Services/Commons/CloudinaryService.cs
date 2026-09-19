@@ -59,6 +59,37 @@ namespace SmartFarmSEP490.Service.Services.Commons
                    ?? throw new InvalidOperationException("Cloudinary returned no URL.");
         }
 
+        public async Task<string> UploadBytesAsync(byte[] bytes, string fileName, string folder, CancellationToken ct = default)
+        {
+            if (bytes == null || bytes.Length == 0)
+                throw new ArgumentException("Bytes is empty.", nameof(bytes));
+
+            var targetFolder = string.IsNullOrWhiteSpace(folder) ? _settings.Folder : folder;
+            var safeName = string.IsNullOrWhiteSpace(fileName) ? $"upload_{Guid.NewGuid():N}.jpg" : fileName;
+
+            await using var stream = new MemoryStream(bytes);
+            var uploadParams = new ImageUploadParams
+            {
+                File = new FileDescription(safeName, stream),
+                Folder = targetFolder,
+                UseFilename = true,
+                UniqueFilename = true,
+                Overwrite = false
+            };
+
+            var uploadResult = await _cloudinary.UploadAsync(uploadParams, ct);
+            if (uploadResult.Error != null)
+                throw new InvalidOperationException($"Cloudinary upload failed: {uploadResult.Error.Message}");
+
+            _logger.LogInformation(
+                "Uploaded bytes {Bytes} ({FileName}) to Cloudinary as {PublicId} in folder {Folder}",
+                bytes.Length, safeName, uploadResult.PublicId, targetFolder);
+
+            return uploadResult.SecureUrl?.ToString()
+                   ?? uploadResult.Url?.ToString()
+                   ?? throw new InvalidOperationException("Cloudinary returned no URL.");
+        }
+
         public async Task<bool> DeleteAsync(string publicId, CancellationToken ct = default)
         {
             if (string.IsNullOrWhiteSpace(publicId)) return false;
