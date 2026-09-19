@@ -101,6 +101,9 @@ dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.SensorType>("SensorType", 
 dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.TaskAssignmentStatus>("TaskAssignmentStatus", enumNameTranslator);
 dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.TaskStatus>("TaskStatus", enumNameTranslator);
 dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.TaskType>("TaskType", enumNameTranslator);
+dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.AIProvider>("AIProvider", enumNameTranslator);
+dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.AIStatus>("AIStatus", enumNameTranslator);
+dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.AIFinalStatus>("AIFinalStatus", enumNameTranslator);
 var dataSource = dataSourceBuilder.Build();
 
 builder.Services.AddDbContext<SmartFarmDbContext>(options =>
@@ -184,6 +187,37 @@ builder.Services.AddHostedService<OverdueTaskSweepBackgroundService>();
 // Reminder: nhắc nhở hằng ngày task chưa hoàn thành trong ngày
 builder.Services.AddScoped<IReminderTaskService, ReminderTaskService>();
 builder.Services.AddHostedService<ReminderSweepBackgroundService>();
+
+// ============================================================
+// AI Analysis (Tomato Leaf Disease + Argo Pest)
+// ============================================================
+builder.Services.Configure<SmartFarmSEP490.Model.DTOs.AIOptions>(
+    builder.Configuration.GetSection(SmartFarmSEP490.Model.DTOs.AIOptions.SectionName));
+
+// Channel<Guid> — in-memory queue cho AI worker (singleton)
+builder.Services.AddSingleton(_ =>
+    System.Threading.Channels.Channel.CreateUnbounded<Guid>(
+        new System.Threading.Channels.UnboundedChannelOptions
+        {
+            SingleReader = true,    // 1 worker consume
+            SingleWriter = false    // nhiều controller enqueue
+        }));
+
+builder.Services.AddHttpClient("ai-backend", c =>
+{
+    var sec = builder.Configuration.GetValue<int?>("AI:TimeoutSeconds") ?? 120;
+    c.Timeout = TimeSpan.FromSeconds(sec);
+});
+builder.Services.AddHttpClient("image-downloader", c =>
+{
+    c.Timeout = TimeSpan.FromSeconds(60);
+});
+
+builder.Services.AddScoped<SmartFarmSEP490.Repository.Interfaces.AI.IAIAnalysisRepository,
+                          SmartFarmSEP490.Repository.Implementations.AI.AIAnalysisRepository>();
+builder.Services.AddScoped<SmartFarmSEP490.Service.Interfaces.AI.IAIAnalysisService,
+                          SmartFarmSEP490.Service.Services.AI.AIAnalysisService>();
+builder.Services.AddHostedService<SmartFarmSEP490.Service.Services.AI.AIAnalysisWorker>();
 
 // Skills / UserSkills / Task Count
 builder.Services.AddScoped<SmartFarmSEP490.Repository.Interfaces.Skills.ISkillRepository,

@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SmartFarmSEP490.Model.DTOs;
+using SmartFarmSEP490.Service.Interfaces.AI;
 using SmartFarmSEP490.Service.Interfaces.Tasks;
 
 namespace SmartFarmSEP490.API.Controllers;
@@ -12,10 +13,12 @@ namespace SmartFarmSEP490.API.Controllers;
 public class TaskImagesController : ControllerBase
 {
     private readonly ITaskImageService _imageService;
+    private readonly IAIAnalysisService _aiService;
 
-    public TaskImagesController(ITaskImageService imageService)
+    public TaskImagesController(ITaskImageService imageService, IAIAnalysisService aiService)
     {
         _imageService = imageService;
+        _aiService = aiService;
     }
 
     private Guid GetUserId() => Guid.Parse(User.FindFirstValue(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)
@@ -31,7 +34,9 @@ public class TaskImagesController : ControllerBase
     ///   - taskReportId: guid? (optional)
     ///   - caption: string? (optional)
     ///   - capturedAt: datetime? (optional, ISO 8601)
-    /// File sẽ được push lên Cloudinary, response trả về imageUrl hosted.
+    ///   - aiProvider: "TomatoLeafDiseaseOnnx" | "ArgoPestOnnx" (optional - tự suy ra từ caption)
+    /// File sẽ được push lên Cloudinary, response trả về imageUrl hosted + AIStatus=Pending.
+    /// AI chạy async trong Background Worker; FE poll GET /api/task-images/task/{taskReportId}/detail để lấy kết quả.
     /// </summary>
     [HttpPost("upload")]
     [Consumes("multipart/form-data")]
@@ -50,6 +55,7 @@ public class TaskImagesController : ControllerBase
             form.TaskReportId,
             form.Caption,
             form.CapturedAt,
+            form.AIProvider,  // nullable — Worker tự suy ra nếu null
             GetUserId(),
             ct);
 
@@ -57,12 +63,33 @@ public class TaskImagesController : ControllerBase
     }
 
     /// <summary>
-    /// Get Images By Task (via TaskReportId)
+    /// Get Images By Task (qua TaskReportId) — bản cũ trả DTO đơn giản.
     /// </summary>
     [HttpGet("task/{taskReportId:guid}")]
     public async Task<IActionResult> GetByTaskReport(Guid taskReportId)
     {
         return Ok(await _imageService.GetByTaskReportIdAsync(taskReportId));
+    }
+
+    /// <summary>
+    /// Get Images By Task — bản chi tiết có AIAnalysis đầy đủ (cho FE poll).
+    /// </summary>
+    /// <param name="includeAnalysis">Mặc định true. Set false nếu chỉ cần list + AIStatus.</param>
+    [HttpGet("task/{taskReportId:guid}/detail")]
+    public async Task<IActionResult> GetByTaskReportDetail(Guid taskReportId, [FromQuery] bool includeAnalysis = true, CancellationToken ct = default)
+    {
+        var result = await _aiService.GetByTaskReportAsync(taskReportId, includeAnalysis, ct);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Re-enqueue một PlantImage để AI xử lý lại (dùng khi Failed hoặc muốn predict lại với provider khác).
+    /// </summary>
+    [HttpPost("{id:guid}/retry")]
+    public async Task<IActionResult> Retry(Guid id, CancellationToken ct)
+    {
+        await _aiService.EnqueueAsync(id, ct);
+        return Accepted(new { id, message = "Re-enqueued for AI processing." });
     }
 
     /// <summary>
