@@ -16,6 +16,8 @@ public partial class SmartFarmDbContext : DbContext
     {
     }
 
+    public virtual DbSet<AIAnalysis> AIAnalyses { get; set; }
+
     public virtual DbSet<AitaskAssignmentSuggestion> AitaskAssignmentSuggestions { get; set; }
 
     public virtual DbSet<Alert> Alerts { get; set; }
@@ -96,6 +98,13 @@ public partial class SmartFarmDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder
+            .HasPostgresEnum("AIProvider", new[] { "TomatoLeafDiseaseOnnx", "ArgoPestOnnx" })
+            .HasPostgresEnum("AIStatus", new[] { "Pending", "Processing", "Completed", "Failed" })
+            .HasPostgresEnum("AIFinalStatus", new[] {
+                "Unknown",
+                "NotTomatoLeaf", "NoLeafDetected", "TomatoLeafClassified",
+                "NoPest", "NoPestDetected", "PestClassified"
+            })
             .HasPostgresEnum("AIReviewStatus", new[] { "Suggested", "Accepted", "Rejected", "Adjusted" })
             .HasPostgresEnum("AlertSeverity", new[] { "Low", "Medium", "High", "Critical" })
             .HasPostgresEnum("AllocationStatus", new[] { "Reserved", "Assigned", "Released" })
@@ -112,6 +121,56 @@ public partial class SmartFarmDbContext : DbContext
             .HasPostgresEnum("TaskAssignmentStatus", new[] { "Assigned", "Reassigned", "Resigned", "Completed", "Cancelled" })
             .HasPostgresEnum("TaskStatus", new[] { "Pending", "InProgress", "Completed", "Overdue", "Cancelled" })
             .HasPostgresEnum("TaskType", new[] { "Planting", "Watering", "Fertilizing", "Observation", "Inspection", "Harvest", "Other" });
+
+        modelBuilder.Entity<AIAnalysis>(entity =>
+        {
+            entity.ToTable("AIAnalysis");
+
+            entity.HasKey(e => e.Id).HasName("AIAnalysis_pkey");
+
+            entity.HasIndex(e => e.PlantImageId, "IX_AIAnalysis_PlantImageId").IsUnique();
+            entity.HasIndex(e => e.TaskReportId, "IX_AIAnalysis_TaskReportId");
+            entity.HasIndex(e => e.AIProvider, "IX_AIAnalysis_AIProvider");
+            entity.HasIndex(e => e.FinalStatus, "IX_AIAnalysis_FinalStatus");
+            entity.HasIndex(e => e.CreatedAt, "IX_AIAnalysis_CreatedAt");
+
+            entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
+            entity.Property(e => e.AIProvider).HasColumnType("public.\"AIProvider\"");
+            entity.Property(e => e.FinalStatus).HasColumnType("public.\"AIFinalStatus\"");
+            entity.Property(e => e.AIStatus).HasColumnType("public.\"AIStatus\"");
+            entity.Property(e => e.Label).HasMaxLength(200);
+            entity.Property(e => e.GateLabel).HasMaxLength(50);
+            entity.Property(e => e.Confidence).HasPrecision(6, 5);
+            entity.Property(e => e.GateConfidence).HasPrecision(6, 5);
+            entity.Property(e => e.BestBoxX1).HasPrecision(10, 2);
+            entity.Property(e => e.BestBoxY1).HasPrecision(10, 2);
+            entity.Property(e => e.BestBoxX2).HasPrecision(10, 2);
+            entity.Property(e => e.BestBoxY2).HasPrecision(10, 2);
+            entity.Property(e => e.AnnotatedImageUrl).HasMaxLength(2048);
+            entity.Property(e => e.ApiVersion).HasMaxLength(20);
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("now()")
+                .HasColumnType("timestamp with time zone");
+            entity.Property(e => e.UpdatedAt)
+                .HasDefaultValueSql("now()")
+                .HasColumnType("timestamp with time zone");
+            entity.Property(e => e.RequestedAt)
+                .HasDefaultValueSql("now()")
+                .HasColumnType("timestamp with time zone");
+            entity.Property(e => e.CompletedAt).HasColumnType("timestamp with time zone");
+            entity.Property(e => e.RawResultJson).HasColumnType("jsonb");
+            entity.Property(e => e.ProbabilitiesJson).HasColumnType("jsonb");
+
+            entity.HasOne(d => d.PlantImage).WithMany(p => p.AIAnalyses)
+                .HasForeignKey(d => d.PlantImageId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("AIAnalysis_PlantImageId_fkey");
+
+            entity.HasOne(d => d.TaskReport).WithMany(p => p.AIAnalyses)
+                .HasForeignKey(d => d.TaskReportId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("AIAnalysis_TaskReportId_fkey");
+        });
 
         modelBuilder.Entity<AitaskAssignmentSuggestion>(entity =>
         {
@@ -729,6 +788,12 @@ public partial class SmartFarmDbContext : DbContext
             entity.HasIndex(e => e.BatchId, "IX_PlantImages_BatchId");
 
             entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
+            entity.Property(e => e.AIConfidence).HasPrecision(6, 5);
+            entity.Property(e => e.AIConfidenceRate).HasPrecision(6, 2);
+            entity.Property(e => e.AIStatus).HasColumnType("public.\"AIStatus\"");
+            entity.Property(e => e.AIProvider).HasColumnType("public.\"AIProvider\"");
+            entity.Property(e => e.AIPredictedLabel).HasMaxLength(200);
+            entity.Property(e => e.AIAnnotatedImageUrl).HasMaxLength(2048);
             entity.Property(e => e.CapturedAt).HasColumnType("timestamp without time zone");
             entity.Property(e => e.CreatedAt)
                 .HasDefaultValueSql("now()")

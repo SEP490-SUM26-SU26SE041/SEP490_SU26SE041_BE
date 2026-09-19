@@ -22,6 +22,7 @@ public interface ITaskImageService
         Guid? taskReportId,
         string? caption,
         DateTime? capturedAt,
+        string? aiProvider,
         Guid uploadedBy,
         CancellationToken ct = default);
     Task<List<PlantImageResponseDto>> GetByTaskReportIdAsync(Guid taskReportId);

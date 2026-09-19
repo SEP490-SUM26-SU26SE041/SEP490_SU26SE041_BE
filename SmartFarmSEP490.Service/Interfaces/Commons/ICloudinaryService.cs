@@ -11,6 +11,12 @@ namespace SmartFarmSEP490.Service.Interfaces.Commons
         Task<string> UploadImageAsync(IFormFile file, string folder, CancellationToken ct = default);
 
         /// <summary>
+        /// Upload a byte array (image) to Cloudinary and return its secure URL.
+        /// Dùng cho Worker upload annotated image từ base64 (Argo Pest).
+        /// </summary>
+        Task<string> UploadBytesAsync(byte[] bytes, string fileName, string folder, CancellationToken ct = default);
+
+        /// <summary>
         /// Delete a Cloudinary asset by its public_id.
         /// </summary>
         Task<bool> DeleteAsync(string publicId, CancellationToken ct = default);

@@ -10,4 +10,12 @@ public class UploadTaskImageForm
     public Guid? TaskReportId { get; set; }
     public string? Caption { get; set; }
     public DateTime? CapturedAt { get; set; }
+
+    /// <summary>
+    /// (Optional) Chọn AI provider. Nếu null/empty sẽ tự suy ra từ Task type:
+    ///  - Observation/Inspection task → mặc định TomatoLeafDiseaseOnnx
+    ///  - Pest control task → ArgoPestOnnx
+    ///  - Có thể override thủ công từ FE.
+    /// </summary>
+    public string? AIProvider { get; set; }
 }
