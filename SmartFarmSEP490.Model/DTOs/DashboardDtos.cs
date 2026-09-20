@@ -317,6 +317,7 @@ public class CreateExperimentReportDto
     public string? Summary { get; set; }
     public string? ResultData { get; set; }
     public string? ExportFormat { get; set; }
+    public string? FileUrl { get; set; }
 }
 
 public class ExportReportRequestDto
