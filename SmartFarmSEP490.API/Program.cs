@@ -132,6 +132,7 @@ builder.Services.AddScoped<IExperimentDesignService, ExperimentDesignService>();
 builder.Services.AddScoped<IMeasurementDefinitionService, MeasurementDefinitionService>();
 builder.Services.AddScoped<IProcedureTemplateService, ProcedureTemplateService>();
 builder.Services.AddScoped<ICareScheduleService, CareScheduleService>();
+builder.Services.AddScoped<IExperimentReportService, ExperimentReportService>();
 
 builder.Services.AddScoped<IFarmRepository, FarmRepository>();
 builder.Services.AddScoped<IAreaRepository, AreaRepository>();

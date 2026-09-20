@@ -66,3 +66,13 @@ public interface ICareScheduleService
     Task<List<CareScheduleResponseDto>> GetByExperimentAsync(Guid experimentId);
     Task<bool> DeleteAsync(Guid id);
 }
+
+public interface IExperimentReportService
+{
+    Task<ExperimentReportResponseDto?> CreateAsync(Guid experimentId, CreateExperimentReportDto dto, Guid userId);
+    Task<ExperimentReportResponseDto?> UpdateAsync(Guid id, UpdateExperimentReportDto dto, Guid userId);
+    Task<ExperimentReportResponseDto?> GetByIdAsync(Guid id);
+    Task<List<ExperimentReportResponseDto>> GetByExperimentAsync(Guid experimentId);
+    Task<List<ExperimentReportResponseDto>> GetAllAsync();
+    Task<bool> DeleteAsync(Guid id);
+}

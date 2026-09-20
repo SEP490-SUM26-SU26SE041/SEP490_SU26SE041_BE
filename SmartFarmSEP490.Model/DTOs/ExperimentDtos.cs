@@ -334,3 +334,33 @@ public class MonitoringPlanDto
     public List<TreatmentDto>? Treatments { get; set; }
     public Dictionary<string, List<string>>? FactorialFactors { get; set; }
 }
+
+// ============ ExperimentReport DTOs ============
+
+// Reuse CreateExperimentReportDto from DashboardDtos.cs (existing).
+public class UpdateExperimentReportDto
+{
+    public string? ReportType { get; set; }
+    public string? Title { get; set; }
+    public string? Summary { get; set; }
+    public string? ResultData { get; set; }
+    public string? ExportFormat { get; set; }
+    public string? FileUrl { get; set; }
+}
+
+public class ExperimentReportResponseDto
+{
+    public Guid Id { get; set; }
+    public Guid ExperimentId { get; set; }
+    public string? ExperimentCode { get; set; }
+    public string? ExperimentTitle { get; set; }
+    public Guid? CreatedBy { get; set; }
+    public string? CreatedByName { get; set; }
+    public string ReportType { get; set; } = string.Empty;
+    public string Title { get; set; } = string.Empty;
+    public string? Summary { get; set; }
+    public string? ResultData { get; set; }
+    public string? ExportFormat { get; set; }
+    public string? FileUrl { get; set; }
+    public DateTime CreatedAt { get; set; }
+}
