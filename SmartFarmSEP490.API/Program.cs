@@ -70,6 +70,12 @@ using SmartFarmSEP490.Repository.Interfaces.Sensors;
 using SmartFarmSEP490.Repository.Implementations.Sensors;
 using SmartFarmSEP490.Repository.Interfaces.Alerts;
 using SmartFarmSEP490.Repository.Implementations.Alerts;
+using SmartFarmSEP490.Repository.Interfaces.IoTDevices;
+using SmartFarmSEP490.Repository.Implementations.IoTDevices;
+using SmartFarmSEP490.Service.Interfaces.IoTDevices;
+using SmartFarmSEP490.Service.Services.IoTDevices;
+using SmartFarmSEP490.Service.Interfaces.Mqtt;
+using SmartFarmSEP490.Service.Services.Mqtt;
 using SmartFarmSEP490.Service.Interfaces.Dashboard;
 using SmartFarmSEP490.Service.Services.Dashboard;
 
@@ -98,6 +104,7 @@ dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.LocationStatus>("LocationS
 dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.RequestStatus>("RequestStatus", enumNameTranslator);
 dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.ReviewResult>("ReviewResult", enumNameTranslator);
 dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.SensorType>("SensorType", enumNameTranslator);
+dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.IoTDeviceStatus>("IoTDeviceStatus", enumNameTranslator);
 dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.TaskAssignmentStatus>("TaskAssignmentStatus", enumNameTranslator);
 dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.TaskStatus>("TaskStatus", enumNameTranslator);
 dataSourceBuilder.MapEnum<SmartFarmSEP490.Model.Enums.TaskType>("TaskType", enumNameTranslator);
@@ -178,6 +185,22 @@ builder.Services.AddScoped<IExperimentReportRepository, ExperimentReportReposito
 builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<IComparisonService, ComparisonService>();
 builder.Services.AddScoped<IReportExportService, ReportExportService>();
+
+// IoT Device Services
+builder.Services.AddScoped<IIoTDeviceRepository, IoTDeviceRepository>();
+builder.Services.AddScoped<IIoTDeviceService, IoTDeviceService>();
+
+// MQTT Settings (bind từ appsettings.json section "Mqtt")
+builder.Services.Configure<MqttSettings>(builder.Configuration.GetSection("Mqtt"));
+builder.Services.AddSingleton<IMqttSettings>(sp =>
+    sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<MqttSettings>>().Value);
+
+// MQTT Message Handler (scoped vì dùng DB context)
+builder.Services.AddScoped<IMqttMessageHandler, MqttMessageHandler>();
+
+// MQTT Background Services
+builder.Services.AddHostedService<MqttHostedService>();
+builder.Services.AddHostedService<DeviceHealthMonitorService>();
 
 // Overdue sweep (idempotent) — gọi 2 nơi:
 //   1. Lazy ở đầu các TaskService.Get*() để user thấy status = Overdue ngay khi GET

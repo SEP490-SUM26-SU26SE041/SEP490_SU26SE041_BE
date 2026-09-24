@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using SmartFarmSEP490.Model.Enums;
 
@@ -31,6 +31,17 @@ public partial class Batch
     public DateTime CreatedAt { get; set; }
 
     public DateTime? DeletedAt { get; set; }
+
+    /// <summary>
+    /// Cho biết batch này có được kích hoạt IoT không.
+    /// Khi IsIoTEnabled = true: các IoTDevice gán vào batch mới có thể hoạt động.
+    /// </summary>
+    public bool IsIoTEnabled { get; set; } = false;
+
+    /// <summary>
+    /// Timestamp kích hoạt IoT (để tracking).
+    /// </summary>
+    public DateTime? IoTEnabledAt { get; set; }
 
     public virtual ICollection<Alert> Alerts { get; set; } = new List<Alert>();
 

@@ -76,6 +76,12 @@ public partial class SmartFarmDbContext : DbContext
 
     public virtual DbSet<SensorThresholdRule> SensorThresholdRules { get; set; }
 
+    public virtual DbSet<IoTDevice> IoTDevices { get; set; }
+
+    public virtual DbSet<IoTDeviceSensor> IoTDeviceSensors { get; set; }
+
+    public virtual DbSet<IoTAlertConfig> IoTAlertConfigs { get; set; }
+
     public virtual DbSet<Skill> Skills { get; set; }
 
     public virtual DbSet<Task> Tasks { get; set; }
@@ -118,6 +124,7 @@ public partial class SmartFarmDbContext : DbContext
             .HasPostgresEnum("RequestStatus", new[] { "Pending", "Approved", "Rejected", "Cancelled" })
             .HasPostgresEnum("ReviewResult", new[] { "Approved", "Rejected" })
             .HasPostgresEnum("SensorType", new[] { "Temperature", "Humidity", "SoilMoisture", "Light", "PH", "Other" })
+            .HasPostgresEnum("IoTDeviceStatus", new[] { "Inactive", "Active" })
             .HasPostgresEnum("TaskAssignmentStatus", new[] { "Assigned", "Reassigned", "Resigned", "Completed", "Cancelled" })
             .HasPostgresEnum("TaskStatus", new[] { "Pending", "InProgress", "Completed", "Overdue", "Cancelled" })
             .HasPostgresEnum("TaskType", new[] { "Planting", "Watering", "Fertilizing", "Observation", "Inspection", "Harvest", "Other" });
@@ -307,6 +314,8 @@ public partial class SmartFarmDbContext : DbContext
                 .HasColumnType("timestamp without time zone");
             entity.Property(e => e.DeletedAt).HasColumnType("timestamp without time zone");
             entity.Property(e => e.Status).HasColumnType("public.\"BatchStatus\"");
+            entity.Property(e => e.IsIoTEnabled).HasDefaultValue(false);
+            entity.Property(e => e.IoTEnabledAt).HasColumnType("timestamp with time zone");
 
             entity.HasOne(d => d.CropVariety).WithMany(p => p.Batches)
                 .HasForeignKey(d => d.CropVarietyId)
@@ -952,6 +961,85 @@ public partial class SmartFarmDbContext : DbContext
             entity.HasOne(d => d.Experiment).WithMany(p => p.SensorThresholdRules)
                 .HasForeignKey(d => d.ExperimentId)
                 .HasConstraintName("SensorThresholdRules_ExperimentId_fkey");
+        });
+
+        modelBuilder.Entity<IoTDevice>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("IoTDevices_pkey");
+
+            entity.HasIndex(e => e.DeviceCode, "IoTDevices_DeviceCode_key").IsUnique();
+            entity.HasIndex(e => e.BatchId, "IX_IoTDevices_BatchId");
+            entity.HasIndex(e => e.Status, "IX_IoTDevices_Status");
+            entity.HasIndex(e => e.IsActive, "IX_IoTDevices_IsActive");
+            entity.HasIndex(e => e.LastActiveAt, "IX_IoTDevices_LastActiveAt");
+            entity.HasIndex(e => e.DeviceType, "IX_IoTDevices_DeviceType");
+
+            entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
+            entity.Property(e => e.DeviceCode).HasMaxLength(50).IsRequired();
+            entity.Property(e => e.DeviceName).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.MacAddress).HasMaxLength(17);
+            entity.Property(e => e.DeviceType).HasMaxLength(50)
+                .HasDefaultValueSql("'ESP32C3_WaterSensor'::character varying");
+            entity.Property(e => e.IsActive).HasDefaultValue(false);
+            entity.Property(e => e.Status).HasColumnType("public.\"IoTDeviceStatus\"")
+                .HasDefaultValueSql("'Inactive'::\"IoTDeviceStatus\"");
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("now()")
+                .HasColumnType("timestamp with time zone");
+            entity.Property(e => e.LastActiveAt).HasColumnType("timestamp with time zone");
+            entity.Property(e => e.UpdatedAt)
+                .HasDefaultValueSql("now()")
+                .HasColumnType("timestamp with time zone");
+
+            entity.HasOne(d => d.Batch).WithMany()
+                .HasForeignKey(d => d.BatchId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("IoTDevices_BatchId_fkey");
+        });
+
+        modelBuilder.Entity<IoTDeviceSensor>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("IoTDeviceSensors_pkey");
+
+            entity.HasIndex(e => new { e.IoTDeviceId, e.SensorId },
+                "UQ_IoTDeviceSensors_Device_Sensor").IsUnique();
+            entity.HasIndex(e => new { e.IoTDeviceId, e.MqttFieldName },
+                "UQ_IoTDeviceSensors_Device_MqttField").IsUnique();
+            entity.HasIndex(e => e.IoTDeviceId, "IX_IoTDeviceSensors_IoTDeviceId");
+            entity.HasIndex(e => e.SensorId, "IX_IoTDeviceSensors_SensorId");
+            entity.HasIndex(e => e.MqttFieldName, "IX_IoTDeviceSensors_MqttFieldName");
+
+            entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
+            entity.Property(e => e.MqttFieldName).HasMaxLength(50).IsRequired();
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("now()")
+                .HasColumnType("timestamp with time zone");
+
+            entity.HasOne(d => d.IoTDevice).WithMany(p => p.DeviceSensors)
+                .HasForeignKey(d => d.IoTDeviceId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("IoTDeviceSensors_IoTDeviceId_fkey");
+
+            entity.HasOne(d => d.Sensor).WithMany()
+                .HasForeignKey(d => d.SensorId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("IoTDeviceSensors_SensorId_fkey");
+        });
+
+        modelBuilder.Entity<IoTAlertConfig>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("IoTAlertConfigs_pkey");
+
+            entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
+            entity.Property(e => e.OfflineThresholdMinutes).HasDefaultValue(5);
+            entity.Property(e => e.CheckIntervalSeconds).HasDefaultValue(60);
+            entity.Property(e => e.IsEnabled).HasDefaultValue(true);
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("now()")
+                .HasColumnType("timestamp with time zone");
+            entity.Property(e => e.UpdatedAt)
+                .HasDefaultValueSql("now()")
+                .HasColumnType("timestamp with time zone");
         });
 
         modelBuilder.Entity<Skill>(entity =>
