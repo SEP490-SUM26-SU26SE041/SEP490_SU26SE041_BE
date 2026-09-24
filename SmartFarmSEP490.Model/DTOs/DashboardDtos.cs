@@ -6,6 +6,9 @@ public class DashboardOverviewDto
 {
     public int TotalExperiments { get; set; }
     public int ActiveExperiments { get; set; }
+    public int PausedExperiments { get; set; }
+    public int CompletedExperiments { get; set; }
+    public int CancelledExperiments { get; set; }
     public int TotalBatches { get; set; }
     public int ActiveBatches { get; set; }
     public int TotalAreas { get; set; }
@@ -123,6 +126,9 @@ public class DashboardKpiDto
     public int TotalBatches { get; set; }
     public int ActiveBatches { get; set; }
     public int HarvestedBatches { get; set; }
+
+    public int PausedExperiments { get; set; }
+    public int CancelledExperiments { get; set; }
 
     public int TotalMeasurementRecords { get; set; }
     public List<DailyMetricDto> DailyCompletions { get; set; } = new();

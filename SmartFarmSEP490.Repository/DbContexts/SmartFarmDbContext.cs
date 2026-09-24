@@ -118,7 +118,7 @@ public partial class SmartFarmDbContext : DbContext
             .HasPostgresEnum("DesignType", new[] { "CompletelyRandomized", "RandomizedCompleteBlock", "Factorial", "Observational", "Other" })
             .HasPostgresEnum("DocumentStatus", new[] { "Draft", "Indexed", "Archived" })
             .HasPostgresEnum("ExperimentStageType", new[] { "Nursery", "Care", "Growth", "Harvest", "Evaluation", "Other" })
-            .HasPostgresEnum("ExperimentStatus", new[] { "Active", "Completed" })
+            .HasPostgresEnum("ExperimentStatus", new[] { "Active", "Completed", "Paused", "Cancelled" })
             .HasPostgresEnum("GroupType", new[] { "Control", "Treatment" })
             .HasPostgresEnum("LocationStatus", new[] { "Available", "InUse", "Maintenance", "Unavailable" })
             .HasPostgresEnum("RequestStatus", new[] { "Pending", "Approved", "Rejected", "Cancelled" })
