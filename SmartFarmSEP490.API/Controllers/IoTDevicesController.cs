@@ -12,11 +12,11 @@ namespace SmartFarmSEP490.API.Controllers;
 
 /// <summary>
 /// API quản lý thiết bị IoT (ESP32-C3 Water Sensor).
-/// Quyền: Manager, Admin.
+/// Quyền: Researcher. Researcher tự quản lý thiết bị IoT cho experiment của mình.
 /// </summary>
 [Route("api/iot-devices")]
 [ApiController]
-[Authorize(Roles = "Manager,Admin")]
+[Authorize(Roles = "Researcher")]
 public class IoTDevicesController : ControllerBase
 {
     private readonly IIoTDeviceService _service;
