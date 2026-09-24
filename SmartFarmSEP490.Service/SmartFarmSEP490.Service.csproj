@@ -15,6 +15,8 @@
     <PackageReference Include="MailKit" Version="4.3.0" />
     <PackageReference Include="MimeKit" Version="4.3.0" />
     <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
+    <PackageReference Include="MQTTnet" Version="4.3.7.1207" />
+    <PackageReference Include="MQTTnet.Extensions.ManagedClient" Version="4.3.7.1207" />
     <ProjectReference Include="..\SmartFarmSEP490.Repository\SmartFarmSEP490.Repository.csproj" />
     <ProjectReference Include="..\SmartFarmSEP490.Model\SmartFarmSEP490.Model.csproj" />
   </ItemGroup>

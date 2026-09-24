@@ -37,6 +37,26 @@ public class SensorRepository : ISensorRepository
         return await Task.FromResult(_context.Sensors.FirstOrDefault(s => s.Id == id));
     }
 
+    public async Task<Sensor?> GetByCodeAsync(string sensorCode)
+    {
+        return await Task.FromResult(_context.Sensors.FirstOrDefault(s => s.SensorCode == sensorCode));
+    }
+
+    public async Task AddAsync(Sensor sensor)
+    {
+        await _context.Sensors.AddAsync(sensor);
+    }
+
+    public async Task AddSensorDataAsync(SensorDatum data)
+    {
+        await _context.SensorData.AddAsync(data);
+    }
+
+    public async Task SaveChangesAsync()
+    {
+        await _context.SaveChangesAsync();
+    }
+
     public async Task<List<SensorDatum>> GetSensorDataAsync(Guid sensorId, DateTime? fromDate = null, DateTime? toDate = null, int limit = 100)
     {
         var query = _context.SensorData
