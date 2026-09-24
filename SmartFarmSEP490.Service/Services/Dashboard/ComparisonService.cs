@@ -173,7 +173,9 @@ public class ComparisonService : IComparisonService
             ? await _experimentRepository.GetByFarmAsync(farmId.Value)
             : await _experimentRepository.GetAllAsync();
 
-        var completedExperiments = experiments.Where(e => e.Status == ExperimentStatus.Completed).ToList();
+        var completedExperiments = experiments
+            .Where(e => e.Status == ExperimentStatus.Completed || e.Status == ExperimentStatus.Cancelled)
+            .ToList();
         var result = new List<CultivationComparisonDto>();
 
         foreach (var exp in completedExperiments)

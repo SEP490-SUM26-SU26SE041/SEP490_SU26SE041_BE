@@ -188,7 +188,12 @@ public class ExperimentService : IExperimentService
             if (dto.Hypothesis != null) entity.Hypothesis = dto.Hypothesis;
             if (dto.StartDate.HasValue) entity.StartDate = dto.StartDate.Value;
             if (dto.EndDate.HasValue) entity.EndDate = dto.EndDate;
-            if (dto.Status != null) entity.Status = Enum.Parse<ExperimentStatus>(dto.Status);
+            if (dto.Status != null)
+            {
+                var newStatus = Enum.Parse<ExperimentStatus>(dto.Status);
+                EnsureValidStatusTransition(entity.Status, newStatus);
+                entity.Status = newStatus;
+            }
             await _experimentRepository.UpdateAsync(entity);
             return await GetByIdAsync(id);
         }
@@ -202,12 +207,45 @@ public class ExperimentService : IExperimentService
         {
             var entity = await _experimentRepository.GetByIdAsync(id);
             if (entity == null) return null;
-            entity.Status = Enum.Parse<ExperimentStatus>(status);
+            var newStatus = Enum.Parse<ExperimentStatus>(status);
+            EnsureValidStatusTransition(entity.Status, newStatus);
+            entity.Status = newStatus;
             await _experimentRepository.UpdateAsync(entity);
             return await GetByIdAsync(id);
         }
         catch (InvalidOperationException) { throw; }
         catch (Exception ex) { throw new Exception($"Cap nhat trang thai thuc nghiem that bai: {ex.InnerException?.Message ?? ex.Message}", ex); }
+    }
+
+    /// <summary>
+    /// Kiểm tra chuyển trạng thái hợp lệ:
+    ///   Active   -> Paused | Completed | Cancelled
+    ///   Paused   -> Active | Completed | Cancelled
+    ///   Completed-> (terminal) không thể đổi
+    ///   Cancelled-> (terminal) không thể đổi
+    /// </summary>
+    private static void EnsureValidStatusTransition(ExperimentStatus current, ExperimentStatus next)
+    {
+        if (current == next) return; // không đổi -> OK
+
+        var isValid = (current, next) switch
+        {
+            (ExperimentStatus.Active, ExperimentStatus.Paused)     => true,
+            (ExperimentStatus.Active, ExperimentStatus.Completed) => true,
+            (ExperimentStatus.Active, ExperimentStatus.Cancelled) => true,
+            (ExperimentStatus.Paused, ExperimentStatus.Active)    => true,
+            (ExperimentStatus.Paused, ExperimentStatus.Completed) => true,
+            (ExperimentStatus.Paused, ExperimentStatus.Cancelled) => true,
+            _ => false
+        };
+
+        if (!isValid)
+        {
+            throw new InvalidOperationException(
+                $"Khong the chuyen trang thai thuc nghiem tu '{current}' sang '{next}'. " +
+                $"Allowed: Active<->Paused, Active/Paused -> Completed, Active/Paused -> Cancelled. " +
+                $"Completed va Cancelled la trang thai ket thuc (terminal).");
+        }
     }
 
     public async Task<ExperimentResponseDto?> GetByIdAsync(Guid id)
