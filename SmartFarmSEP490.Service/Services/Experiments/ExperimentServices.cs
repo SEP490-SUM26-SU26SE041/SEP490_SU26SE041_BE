@@ -144,6 +144,8 @@ public class ExperimentService : IExperimentService
                 ExperimentCode = $"EXP-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString()[..8].ToUpper()}",
                 Title = request.Title,
                 Objective = request.Objective,
+                StartDate = request.ExpectedStartDate,
+                EndDate = request.ExpectedEndDate,
                 Status = ExperimentStatus.Active
             };
 
