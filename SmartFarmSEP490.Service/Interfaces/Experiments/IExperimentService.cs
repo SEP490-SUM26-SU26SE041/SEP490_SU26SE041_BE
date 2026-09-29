@@ -16,6 +16,12 @@ public interface IExperimentService
     Task<RandomizationResultDto?> RandomizeBedsAsync(Guid experimentId);
     Task<List<ExperimentGroupResponseDto>> SupplementGroupsAsync(SupplementGroupsDto dto);
     Task AutoSetupExperimentStructureAsync(Guid experimentId);
+
+    /// <summary>
+    /// Trả về lịch sử bed assignments cho một experiment (cả active lẫn released).
+    /// Trả về null nếu experiment không tồn tại.
+    /// </summary>
+    Task<BedHistoryResponseDto?> GetBedHistoryAsync(Guid experimentId);
 }
 
 public interface IExperimentStageService

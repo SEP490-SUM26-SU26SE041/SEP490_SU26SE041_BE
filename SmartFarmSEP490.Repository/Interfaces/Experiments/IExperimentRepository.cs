@@ -15,4 +15,10 @@ public interface IExperimentRepository
     Task<M.ExperimentDesign> CreateDesignAsync(M.ExperimentDesign entity);
     Task UpdateAsync(M.Experiment entity);
     Task DeleteAsync(Guid id);
+
+    /// <summary>
+    /// Lấy các experiment có EndDate < today, đang ở trạng thái Active hoặc Paused,
+    /// chưa bị soft-delete. Dùng cho background sweep auto-complete theo deadline.
+    /// </summary>
+    Task<List<M.Experiment>> GetExpiredAsync(DateOnly today);
 }

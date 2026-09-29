@@ -213,6 +213,15 @@ builder.Services.AddScoped<IReminderTaskService, ReminderTaskService>();
 builder.Services.AddHostedService<ReminderSweepBackgroundService>();
 
 // ============================================================
+// Experiment EndDate sweep
+// Auto-complete experiment quá EndDate (status Active/Paused) + release beds.
+// Mặc định chạy lúc 00:30 ICT mỗi ngày (sau OverdueTaskSweep).
+// Cũng được gọi lazy từ UpdateStatusAsync khi researcher manual complete.
+// ============================================================
+builder.Services.AddScoped<IExperimentCompletionService, ExperimentCompletionService>();
+builder.Services.AddHostedService<ExperimentEndDateSweepBackgroundService>();
+
+// ============================================================
 // AI Analysis (Tomato Leaf Disease + Argo Pest)
 // ============================================================
 builder.Services.Configure<SmartFarmSEP490.Model.DTOs.AIOptions>(

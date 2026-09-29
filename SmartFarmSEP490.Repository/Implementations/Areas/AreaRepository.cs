@@ -13,6 +13,11 @@ public class AreaRepository : IAreaRepository
 
     public async Task<M.Area?> GetByIdAsync(Guid id) => await _context.Areas.FindAsync(id);
 
+    public async Task<M.Area?> GetByIdWithBedsAsync(Guid id) =>
+        await _context.Areas
+            .Include(a => a.Beds).ThenInclude(b => b.ExperimentBedAssignments)
+            .FirstOrDefaultAsync(a => a.Id == id && a.DeletedAt == null);
+
     public async Task<List<M.Area>> GetByFarmAsync(Guid farmId) =>
         await _context.Areas
             .Include(a => a.Beds).ThenInclude(b => b.ExperimentBedAssignments)

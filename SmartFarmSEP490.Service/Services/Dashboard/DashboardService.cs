@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using SmartFarmSEP490.Model.DTOs;
 using SmartFarmSEP490.Model.Enums;
 using SmartFarmSEP490.Repository.DbContexts;
@@ -9,6 +10,7 @@ using SmartFarmSEP490.Repository.Interfaces.Farms;
 using SmartFarmSEP490.Repository.Interfaces.Sensors;
 using SmartFarmSEP490.Repository.Interfaces.Tasks;
 using SmartFarmSEP490.Service.Interfaces.Dashboard;
+using M = SmartFarmSEP490.Model;
 
 namespace SmartFarmSEP490.Service.Services.Dashboard;
 
@@ -52,7 +54,15 @@ public class DashboardService : IDashboardService
     {
         var experiments = await _experimentRepository.GetAllAsync();
         var batches = _context.Batches.ToList();
-        var areas = _context.Areas.ToList();
+
+        // Load Areas kem Beds.ExperimentBedAssignments de tinh trang thai dong
+        var areasQuery = _context.Areas
+            .Include(a => a.Beds).ThenInclude(b => b.ExperimentBedAssignments)
+            .AsQueryable();
+        if (farmId.HasValue)
+            areasQuery = areasQuery.Where(a => a.FarmId == farmId.Value);
+        var areas = await areasQuery.ToListAsync();
+
         var sensors = await _sensorRepository.GetAllAsync();
         var activeAlerts = await _alertRepository.GetActiveAlertsAsync();
 
@@ -62,7 +72,6 @@ public class DashboardService : IDashboardService
             experiments = farmExperiments;
             var farmExperimentIds = farmExperiments.Select(e => e.Id).ToList();
             batches = batches.Where(b => farmExperimentIds.Contains(b.ExperimentId)).ToList();
-            areas = areas.Where(a => a.FarmId == farmId.Value).ToList();
             activeAlerts = activeAlerts.Where(a => farmExperimentIds.Contains(a.ExperimentId ?? Guid.Empty)).ToList();
         }
 
@@ -76,8 +85,10 @@ public class DashboardService : IDashboardService
             TotalBatches = batches.Count,
             ActiveBatches = batches.Count(b => b.Status == BatchStatus.Growing),
             TotalAreas = areas.Count,
-            ActiveAreas = areas.Count(a => a.Status == LocationStatus.InUse),
-            TotalBeds = areas.Sum(a => _context.Beds.Count(b => b.AreaId == a.Id)),
+            // Tinh dong: area co bat ky bed assignment nao KHONG Released => InUse
+            // Maintenance / Unavailable van duoc dem vi van la "active" theo nghia dang su dung
+            ActiveAreas = areas.Count(a => IsAreaInUse(a)),
+            TotalBeds = areas.Sum(a => a.Beds.Count(b => b.DeletedAt == null)),
             ActiveBeds = batches.Count,
             TotalSensors = sensors.Count,
             ActiveSensors = sensors.Count,
@@ -85,6 +96,20 @@ public class DashboardService : IDashboardService
             CriticalAlerts = activeAlerts.Count(a => a.Severity == AlertSeverity.Critical),
             GeneratedAt = DateTime.UtcNow
         };
+    }
+
+    /// <summary>
+    /// Tinh dong: Area co dang duoc su dung neu co bed nao co assignment khong Released.
+    /// Maintenance / Unavailable van tinh vi la nhung trang thai dac biet nguoi dung set.
+    /// </summary>
+    private static bool IsAreaInUse(M.Area area)
+    {
+        if (area.Status == LocationStatus.Maintenance || area.Status == LocationStatus.Unavailable)
+            return true;
+        return area.Beds?
+            .Where(b => b.DeletedAt == null)
+            .SelectMany(b => b.ExperimentBedAssignments ?? new List<M.ExperimentBedAssignment>())
+            .Any(x => x.Status != Model.Enums.AllocationStatus.Released) ?? false;
     }
 
     public async Task<List<FarmHealthDto>> GetFarmHealthListAsync()
@@ -108,7 +133,10 @@ public class DashboardService : IDashboardService
         if (farm == null) return null;
 
         var experiments = (await _experimentRepository.GetByFarmAsync(farmId)).ToList();
-        var areas = _context.Areas.Where(a => a.FarmId == farmId).ToList();
+        var areas = await _context.Areas
+            .Include(a => a.Beds).ThenInclude(b => b.ExperimentBedAssignments)
+            .Where(a => a.FarmId == farmId)
+            .ToListAsync();
         var experimentIds = experiments.Select(e => e.Id).ToList();
         var batches = _context.Batches.Where(b => experimentIds.Contains(b.ExperimentId)).ToList();
         var alerts = await _alertRepository.GetActiveAlertsAsync();
