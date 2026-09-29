@@ -91,12 +91,24 @@ public class ExperimentBedAssignmentRepository : IExperimentBedAssignmentReposit
             .Where(e => e.ExperimentId == experimentId).ToListAsync();
         foreach (var a in assignments)
         {
-            a.ExperimentId = null;
+            // GIU ExperimentId de truy vet lich su (audit trail).
+            // Phan biet "dang dung" vs "da release" dua tren Status != Released,
+            // KHONG dua tren ExperimentId IS NULL (xem ResourceServices, DashboardService).
             a.Status = AllocationStatus.Released;
             a.AssignedTo = DateOnly.FromDateTime(DateTime.UtcNow);
         }
         await _context.SaveChangesAsync();
     }
+
+    public async Task<List<M.ExperimentBedAssignment>> GetHistoryByExperimentAsync(Guid experimentId) =>
+        await _context.ExperimentBedAssignments
+            .Include(e => e.Bed).ThenInclude(b => b.Area)
+            .Include(e => e.Group)
+            .Include(e => e.Batches)
+            .Where(e => e.ExperimentId == experimentId)
+            .OrderBy(e => e.AssignedFrom)
+            .ThenBy(e => e.Bed.BedCode)
+            .ToListAsync();
 
     public async Task<List<Guid>> GetAvailableBedIdsByFarmAsync(Guid farmId)
     {

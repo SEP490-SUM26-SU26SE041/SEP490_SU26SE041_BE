@@ -16,6 +16,13 @@ public interface IExperimentBedAssignmentRepository
     Task AssignBedsToExperimentAsync(Guid requestId, Guid experimentId);
     Task UpdateOrCreateAssignmentAsync(Guid requestId, Guid bedId, Guid? experimentId, DateOnly assignedFrom, string? purpose);
     Task ReleaseBedsAsync(Guid experimentId);
+
+    /// <summary>
+    /// Lấy toàn bộ bed assignments (cả active và released) cho một experiment,
+    /// kèm Include sẵn Bed/Area/Group để FE render. Dùng cho endpoint GET /bed-history.
+    /// </summary>
+    Task<List<M.ExperimentBedAssignment>> GetHistoryByExperimentAsync(Guid experimentId);
+
     Task<List<Guid>> GetAvailableBedIdsByFarmAsync(Guid farmId);
     Task UpdateGroupAssignmentAsync(Guid assignmentId, Guid? groupId, int? replicateIndex);
     Task UpdateRangeAsync(IEnumerable<M.ExperimentBedAssignment> entities);

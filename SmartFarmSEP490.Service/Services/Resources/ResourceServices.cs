@@ -18,6 +18,25 @@ public class FarmService : SvcInterfaces.IFarmService
     private readonly IFarmRepository _farmRepository;
     public FarmService(IFarmRepository farmRepository) => _farmRepository = farmRepository;
 
+    /// <summary>
+    /// Tinh trang thai hieu luc cua Area dua tren:
+    /// - Status cung do admin set (Maintenance / Unavailable) duoc giu nguyen vi day la quyet dinh nghiep vu
+    /// - Neu co bat ky ExperimentBedAssignment nao KHONG phai Released => InUse
+    /// - Nguoc lai => Available
+    /// </summary>
+    internal static LocationStatus ResolveEffectiveAreaStatus(M.Area area)
+    {
+        if (area.Status == LocationStatus.Maintenance || area.Status == LocationStatus.Unavailable)
+            return area.Status;
+
+        var hasActiveAssignment = area.Beds?
+            .Where(b => b.DeletedAt == null)
+            .SelectMany(b => b.ExperimentBedAssignments ?? new List<M.ExperimentBedAssignment>())
+            .Any(x => x.Status != AllocationStatus.Released) ?? false;
+
+        return hasActiveAssignment ? LocationStatus.InUse : LocationStatus.Available;
+    }
+
     public async Task<FarmResponseDto?> CreateAsync(CreateFarmDto dto, Guid? currentUserId = null)
     {
         try
@@ -99,7 +118,7 @@ public class FarmService : SvcInterfaces.IFarmService
         ManagerName = e.Manager?.FullName,
         CreatedAt = e.CreatedAt,
         UpdatedAt = e.UpdatedAt,
-        Areas = e.Areas
+            Areas = e.Areas
             .Where(a => a.DeletedAt == null)
             .Select(a => new AreaResponseDto
             {
@@ -111,7 +130,7 @@ public class FarmService : SvcInterfaces.IFarmService
                 FarmId = a.FarmId,
                 CreatedAt = a.CreatedAt,
                 UpdatedAt = a.UpdatedAt,
-                Status = a.Status.ToString(),
+                Status = ResolveEffectiveAreaStatus(a).ToString(),
                 Beds = (a.Beds ?? new List<M.Bed>())
                     .Where(b => b.DeletedAt == null)
                     .Select(b => new BedResponseDto
@@ -181,7 +200,7 @@ public class AreaService : SvcInterfaces.IAreaService
 
     public async Task<AreaResponseDto?> GetByIdAsync(Guid id)
     {
-        var entity = await _areaRepository.GetByIdAsync(id);
+        var entity = await _areaRepository.GetByIdWithBedsAsync(id);
         if (entity == null) return null;
         return MapToDto(entity);
     }
@@ -208,7 +227,7 @@ public class AreaService : SvcInterfaces.IAreaService
         AreaName = a.AreaName,
         EnvironmentType = a.EnvironmentType,
         TotalArea = a.TotalArea,
-        Status = a.Status.ToString(),
+        Status = FarmService.ResolveEffectiveAreaStatus(a).ToString(),
         CreatedAt = a.CreatedAt,
         UpdatedAt = a.UpdatedAt,
         Beds = (a.Beds ?? new List<M.Bed>())

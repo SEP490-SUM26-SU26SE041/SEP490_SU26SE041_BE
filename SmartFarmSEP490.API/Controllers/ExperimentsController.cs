@@ -380,6 +380,20 @@ public class ExperimentsController : ControllerBase
         catch (Exception ex) { return StatusCode(500, new ApiResponse { Success = false, Message = ex.Message }); }
     }
 
+    [HttpGet("{experimentId:guid}/bed-history")]
+    public async Task<IActionResult> GetBedHistory(Guid experimentId)
+    {
+        if (!await CanAccessExperimentAsync(experimentId)) return Forbid();
+        try
+        {
+            var result = await _experimentService.GetBedHistoryAsync(experimentId);
+            return result == null
+                ? NotFound(new ApiResponse { Success = false, Message = "Khong tim thay thuc nghiem." })
+                : Ok(ApiResponse<BedHistoryResponseDto>.Ok(result));
+        }
+        catch (Exception ex) { return StatusCode(500, new ApiResponse { Success = false, Message = ex.Message }); }
+    }
+
     // ========== Experiment Design ==========
 
     [HttpPost("{experimentId:guid}/design")]

@@ -364,3 +364,55 @@ public class ExperimentReportResponseDto
     public string? FileUrl { get; set; }
     public DateTime CreatedAt { get; set; }
 }
+
+// ============ Bed History DTOs ============
+
+/// <summary>
+/// Một dòng trong lịch sử sử dụng bed cho một experiment.
+/// </summary>
+public class BedHistoryItemDto
+{
+    public Guid AssignmentId { get; set; }
+
+    /// <summary>FK Bed (luôn có).</summary>
+    public Guid BedId { get; set; }
+    public string BedCode { get; set; } = string.Empty;
+    public Guid AreaId { get; set; }
+    public string? AreaName { get; set; }
+
+    /// <summary>FK Group (nullable - bed có thể chưa gán nhóm).</summary>
+    public Guid? GroupId { get; set; }
+    public string? GroupName { get; set; }
+    public int? ReplicateIndex { get; set; }
+
+    /// <summary>Trạng thái cuối cùng của assignment (Released/Assigned/Reserved).</summary>
+    public string Status { get; set; } = string.Empty;
+
+    public DateOnly AssignedFrom { get; set; }
+    public DateOnly? AssignedTo { get; set; }
+
+    public string? Purpose { get; set; }
+
+    /// <summary>
+    /// Số batch đã được tạo trên assignment này (cho biết bed đã "làm việc" bao nhiêu).
+    /// Đếm qua FK Batch.ExperimentBedAssignmentId.
+    /// </summary>
+    public int BatchCount { get; set; }
+}
+
+/// <summary>
+/// Tổng hợp lịch sử bed cho một experiment.
+/// </summary>
+public class BedHistoryResponseDto
+{
+    public Guid ExperimentId { get; set; }
+    public string ExperimentCode { get; set; } = string.Empty;
+    public string? ExperimentTitle { get; set; }
+
+    public int TotalAssignments { get; set; }
+    public int ActiveAssignments { get; set; }   // Status != Released
+    public int ReleasedAssignments { get; set; } // Status == Released
+    public int UniqueBeds { get; set; }
+
+    public List<BedHistoryItemDto> Items { get; set; } = new();
+}

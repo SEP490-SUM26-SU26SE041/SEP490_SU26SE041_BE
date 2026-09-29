@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using M = SmartFarmSEP490.Model;
+using SmartFarmSEP490.Model.Enums;
 using SmartFarmSEP490.Repository.DbContexts;
 using SmartFarmSEP490.Repository.Interfaces.Experiments;
 using Task = System.Threading.Tasks.Task;
@@ -82,4 +83,12 @@ public class ExperimentRepository : IExperimentRepository
         var e = await _context.Experiments.FindAsync(id);
         if (e != null) { e.DeletedAt = DateTime.UtcNow; await UpdateAsync(e); }
     }
+
+    public async Task<List<M.Experiment>> GetExpiredAsync(DateOnly today) =>
+        await _context.Experiments
+            .Where(e => e.EndDate != null
+                        && e.EndDate < today
+                        && (e.Status == ExperimentStatus.Active || e.Status == ExperimentStatus.Paused)
+                        && e.DeletedAt == null)
+            .ToListAsync();
 }

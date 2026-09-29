@@ -28,6 +28,7 @@ public class ExperimentService : IExperimentService
     private readonly IBedRepository _bedRepository;
     private readonly IExperimentGroupRepository _groupRepository;
     private readonly IBatchRepository _batchRepository;
+    private readonly IExperimentCompletionService _completionService;
     private readonly SmartFarmDbContext _context;
 
     public ExperimentService(
@@ -38,6 +39,7 @@ public class ExperimentService : IExperimentService
         IBedRepository bedRepository,
         IExperimentGroupRepository groupRepository,
         IBatchRepository batchRepository,
+        IExperimentCompletionService completionService,
         SmartFarmDbContext context)
     {
         _experimentRepository = experimentRepository;
@@ -47,6 +49,7 @@ public class ExperimentService : IExperimentService
         _bedRepository = bedRepository;
         _groupRepository = groupRepository;
         _batchRepository = batchRepository;
+        _completionService = completionService;
         _context = context;
     }
 
@@ -213,6 +216,15 @@ public class ExperimentService : IExperimentService
             EnsureValidStatusTransition(entity.Status, newStatus);
             entity.Status = newStatus;
             await _experimentRepository.UpdateAsync(entity);
+
+            // Khi thuc nghiem chuyen sang Completed (terminal) → release moi bed assignment
+            // de bed co the duoc dung cho experiment moi. Cancel KHONG release bed theo nghiep vu
+            // (manager/researcher can tu don dep neu muon).
+            if (newStatus == ExperimentStatus.Completed && entity.Status != ExperimentStatus.Completed)
+            {
+                await _completionService.CompleteAsync(id);
+            }
+
             return await GetByIdAsync(id);
         }
         catch (InvalidOperationException) { throw; }
@@ -497,6 +509,52 @@ public class ExperimentService : IExperimentService
         }
 
         return result;
+    }
+
+    public async Task<BedHistoryResponseDto?> GetBedHistoryAsync(Guid experimentId)
+    {
+        try
+        {
+            var entity = await _experimentRepository.GetByIdAsync(experimentId);
+            if (entity == null) return null;
+
+            var assignments = await _bedAssignmentRepository.GetHistoryByExperimentAsync(experimentId);
+
+            var items = assignments.Select(a => new BedHistoryItemDto
+            {
+                AssignmentId = a.Id,
+                BedId = a.BedId,
+                BedCode = a.Bed?.BedCode ?? string.Empty,
+                AreaId = a.Bed?.AreaId ?? Guid.Empty,
+                AreaName = a.Bed?.Area?.AreaName,
+                GroupId = a.GroupId,
+                GroupName = a.Group?.GroupName,
+                ReplicateIndex = a.ReplicateIndex,
+                Status = a.Status.ToString(),
+                AssignedFrom = a.AssignedFrom,
+                AssignedTo = a.AssignedTo,
+                Purpose = a.Purpose,
+                BatchCount = a.Batches == null ? 0 : a.Batches.Count
+            }).ToList();
+
+            var released = items.Count(i => i.Status == AllocationStatus.Released.ToString());
+
+            return new BedHistoryResponseDto
+            {
+                ExperimentId = entity.Id,
+                ExperimentCode = entity.ExperimentCode,
+                ExperimentTitle = entity.Title,
+                TotalAssignments = items.Count,
+                ActiveAssignments = items.Count - released,
+                ReleasedAssignments = released,
+                UniqueBeds = items.Select(i => i.BedId).Distinct().Count(),
+                Items = items
+            };
+        }
+        catch (Exception ex)
+        {
+            throw new Exception($"Lay lich su bed that bai: {ex.InnerException?.Message ?? ex.Message}", ex);
+        }
     }
 
     public async Task<List<ExperimentGroupResponseDto>> SupplementGroupsAsync(SupplementGroupsDto dto)
