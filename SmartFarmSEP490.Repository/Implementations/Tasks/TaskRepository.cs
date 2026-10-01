@@ -293,4 +293,23 @@ public class TaskRepository : ITaskRepository
             })
             .ToList();
     }
+
+    public async Task<int> BulkUpdateStatusByExperimentAsync(
+        Guid experimentId,
+        TaskStatus newStatus,
+        DateTime nowUtc,
+        CancellationToken ct = default)
+    {
+        // Single SQL UPDATE: chỉ đổi các task chưa ở trạng thái terminal (Completed) của experiment.
+        // - Pending/InProgress/Overdue/Cancelled → đều update sang newStatus
+        // - Completed → KHÔNG update (đã là terminal)
+        // - Idempotent: nếu newStatus đã đúng với status hiện tại thì ExecuteUpdate vẫn chạy,
+        //   nhưng số row "ảnh hưởng" vẫn được trả về (Postgres trả về số row match WHERE).
+        return await _context.Tasks
+            .Where(t => t.ExperimentId == experimentId
+                     && t.Status != SmartFarmSEP490.Model.Enums.TaskStatus.Completed)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(t => t.Status, newStatus)
+                .SetProperty(t => t.UpdatedAt, nowUtc), ct);
+    }
 }

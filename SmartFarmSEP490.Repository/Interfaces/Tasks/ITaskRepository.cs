@@ -36,6 +36,15 @@ public interface ITaskRepository
         DateTime startUtc,
         DateTime endUtc,
         CancellationToken ct = default);
+
+    // Bulk update status cho tất cả task thuộc 1 experiment (single SQL UPDATE).
+    // Chỉ update các task KHÔNG thuộc terminal status (Completed) — Completed là trạng thái kết thúc, không nên đè.
+    /// <returns>Số row bị ảnh hưởng.</returns>
+    Task<int> BulkUpdateStatusByExperimentAsync(
+        Guid experimentId,
+        SmartFarmSEP490.Model.Enums.TaskStatus newStatus,
+        DateTime nowUtc,
+        CancellationToken ct = default);
 }
 
 /// <summary>Row thô cho report count task theo user (group by UserId + Status).</summary>
