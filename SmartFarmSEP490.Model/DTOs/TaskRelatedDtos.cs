@@ -68,6 +68,28 @@ public class GenerateByExperimentResultDto
     public List<GeneratedTaskResultDto> Tasks { get; set; } = new();
 }
 
+/// <summary>
+/// Body cho PATCH /api/tasks/bulk-update-by-experiment/{experimentId}.
+/// Dùng khi experiment chuyển sang Paused/Cancelled — dọn dẹp / reset task tạm thời.
+/// Allowed status: "Cancelled" (khi experiment Cancelled) hoặc "Pending" (khi resume từ Paused → Active).
+/// </summary>
+public class BulkUpdateTaskStatusByExperimentDto
+{
+    public string Status { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// Response của PATCH /api/tasks/bulk-update-by-experiment/{experimentId}.
+/// </summary>
+public class BulkUpdateTaskStatusResultDto
+{
+    public Guid ExperimentId { get; set; }
+    public string? ExperimentStatus { get; set; }
+    public string RequestedStatus { get; set; } = string.Empty;
+    public int AffectedTasks { get; set; }
+    public DateTime UpdatedAt { get; set; }
+}
+
 // ============ Task Report DTOs ============
 
 public class CreateTaskReportDto

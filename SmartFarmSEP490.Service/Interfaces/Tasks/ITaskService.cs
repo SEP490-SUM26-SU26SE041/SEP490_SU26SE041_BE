@@ -27,6 +27,17 @@ public interface ITaskService
     // Task Status
     System.Threading.Tasks.Task<TaskResponseDto?> UpdateTaskStatusAsync(Guid id, string status, Guid userId);
 
+    /// <summary>
+    /// Bulk update status cho toàn bộ task thuộc 1 experiment (single SQL UPDATE).
+    /// Chỉ cho phép status = "Cancelled" (experiment bị Cancelled) hoặc "Pending" (resume từ Paused).
+    /// Task đã Completed (terminal) sẽ KHÔNG bị đè.
+    /// </summary>
+    System.Threading.Tasks.Task<BulkUpdateTaskStatusResultDto> BulkUpdateStatusByExperimentAsync(
+        Guid experimentId,
+        BulkUpdateTaskStatusByExperimentDto dto,
+        Guid userId,
+        CancellationToken cancellationToken = default);
+
     // Assignment
     System.Threading.Tasks.Task<TaskResponseDto?> AssignTaskAsync(AssignTaskDto dto, Guid assignedById);
     System.Threading.Tasks.Task<TaskResponseDto?> ReassignTaskAsync(ReassignTaskDto dto, Guid reassignedById);
