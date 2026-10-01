@@ -557,6 +557,67 @@ public class TaskService : ITaskService
         return await MapToResponseDto(task);
     }
 
+    public async System.Threading.Tasks.Task<BulkUpdateTaskStatusResultDto> BulkUpdateStatusByExperimentAsync(
+        Guid experimentId,
+        BulkUpdateTaskStatusByExperimentDto dto,
+        Guid userId,
+        CancellationToken cancellationToken = default)
+    {
+        // 1. Validate experiment tồn tại + trạng thái hiện tại
+        var experiment = await _experimentRepository.GetByIdAsync(experimentId);
+        if (experiment == null)
+            throw new InvalidOperationException($"Khong tim thay thuc nghiem voi ID: {experimentId}");
+
+        // 2. Parse status, chỉ chấp nhận Cancelled hoặc Pending
+        if (!Enum.TryParse<Model.Enums.TaskStatus>(dto.Status, ignoreCase: true, out var parsedStatus)
+            || (parsedStatus != Model.Enums.TaskStatus.Cancelled && parsedStatus != Model.Enums.TaskStatus.Pending))
+        {
+            throw new InvalidOperationException(
+                "Status khong hop le cho bulk update. Chi chap nhan: 'Cancelled' (khi experiment bi huy nhuc) hoac 'Pending' (khi resume).");
+        }
+
+        // 3. Validate theo experiment status:
+        //   - experiment.Cancelled → chỉ cho cancel tasks
+        //   - experiment.Paused    → cho cancel (chuyển sang Paused kiểu mềm)
+        //                           hoặc Pending (nếu muốn reset lại task về trạng thái chờ)
+        //   - experiment.Active    → chỉ cho Pending (resume: restore Cancelled tasks về Pending khi FE re-activate experiment)
+        //   - experiment.Completed → throw (terminal)
+        var isValidContext =
+            (experiment.Status == ExperimentStatus.Cancelled && parsedStatus == Model.Enums.TaskStatus.Cancelled) ||
+            (experiment.Status == ExperimentStatus.Paused && (
+                parsedStatus == Model.Enums.TaskStatus.Cancelled ||
+                parsedStatus == Model.Enums.TaskStatus.Pending)) ||
+            (experiment.Status == ExperimentStatus.Active && parsedStatus == Model.Enums.TaskStatus.Pending);
+
+        if (!isValidContext)
+        {
+            throw new InvalidOperationException(
+                $"Khong the bulk-update task sang '{parsedStatus}' khi experiment dang o trang thai '{experiment.Status}'. " +
+                $"Allowed: experiment=Cancelled -> Cancel tasks; experiment=Paused -> Cancel hoac Reset Pending; experiment=Active -> Reset Pending (resume).");
+        }
+
+        // 4. Single SQL UPDATE — atomic, nhanh, không cần load từng task
+        var nowUtc = DateTime.UtcNow;
+        var affected = await _taskRepository.BulkUpdateStatusByExperimentAsync(
+            experimentId,
+            parsedStatus,
+            nowUtc,
+            cancellationToken);
+
+        _logger.LogInformation(
+            "[BulkUpdateStatusByExperiment] experimentId={ExperimentId} newStatus={NewStatus} affectedRows={Affected} byUser={UserId}",
+            experimentId, parsedStatus, affected, userId);
+
+        return new BulkUpdateTaskStatusResultDto
+        {
+            ExperimentId = experimentId,
+            ExperimentStatus = experiment.Status.ToString(),
+            RequestedStatus = parsedStatus.ToString(),
+            AffectedTasks = affected,
+            UpdatedAt = nowUtc
+        };
+    }
+
     public async System.Threading.Tasks.Task<TaskResponseDto?> AssignTaskAsync(AssignTaskDto dto, Guid assignedById)
     {
         var task = await _taskRepository.GetByIdAsync(dto.TaskId);
