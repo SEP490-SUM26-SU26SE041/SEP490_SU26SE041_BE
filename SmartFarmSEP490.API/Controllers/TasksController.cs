@@ -340,6 +340,54 @@ public class TasksController : ControllerBase
     }
 
     /// <summary>
+    /// Bulk update status cho tất cả task của 1 experiment (single SQL UPDATE).
+    ///
+    /// Mục đích: khi experiment chuyển sang Paused / Cancelled, dọn dẹp các task đã tạo trước đó
+    /// để tránh việc task vẫn được thực hiện dù experiment đã dừng.
+    ///
+    /// Use case:
+    ///   - Experiment Cancelled → body { status: "Cancelled" }  → cancel mọi task Pending/InProgress/Overdue
+    ///   - Experiment Paused    → body { status: "Cancelled" }  → soft-cancel task
+    ///                                hoặc body { status: "Pending" }    → reset task về chờ (chưa chạy lại)
+    ///   - Experiment Active    → KHÔNG cho phép gọi (throw 400)
+    ///   - Experiment Completed → KHÔNG cho phép gọi (throw 400)
+    ///
+    /// Task đã ở trạng thái Completed (đã nộp report) sẽ KHÔNG bị đè.
+    /// Force-cancel cả task đang InProgress (user đang làm dở).
+    ///
+    /// Researcher-only. Researcher phải là chủ experiment.
+    /// </summary>
+    [HttpPatch("bulk-update-by-experiment/{experimentId:guid}")]
+    public async Task<IActionResult> BulkUpdateStatusByExperiment(
+        Guid experimentId,
+        [FromBody] BulkUpdateTaskStatusByExperimentDto dto,
+        CancellationToken ct)
+    {
+        if (!ModelState.IsValid) return BadRequest(ModelState);
+        if (!IsResearcher()) return Forbid();
+        if (!await IsExperimentOwnerAsync(experimentId)) return Forbid();
+
+        if (dto == null || string.IsNullOrWhiteSpace(dto.Status))
+            return BadRequest("Status is required.");
+
+        try
+        {
+            var result = await _taskService.BulkUpdateStatusByExperimentAsync(
+                experimentId, dto, GetUserId(), ct);
+            return Ok(result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Bulk update task status by experiment failed for {ExperimentId}", experimentId);
+            return StatusCode(500, "Bulk update failed: " + ex.Message);
+        }
+    }
+
+    /// <summary>
     /// Update Status (generic)
     /// </summary>
     [HttpPatch("{id:guid}/status")]
