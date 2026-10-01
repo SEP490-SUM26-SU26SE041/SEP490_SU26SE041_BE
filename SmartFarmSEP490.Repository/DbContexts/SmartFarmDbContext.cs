@@ -953,6 +953,18 @@ public partial class SmartFarmDbContext : DbContext
             entity.Property(e => e.MaxValue).HasPrecision(12, 4);
             entity.Property(e => e.MinValue).HasPrecision(12, 4);
 
+            // ✅ SensorType: enum PostgreSQL "SensorType", nullable (NULL = áp dụng mọi loại)
+            entity.Property(e => e.SensorType).HasColumnType("public.\"SensorType\"");
+
+            // ✅ Severity: enum PostgreSQL "AlertSeverity", default 'Medium'
+            entity.Property(e => e.Severity)
+                .HasColumnType("public.\"AlertSeverity\"")
+                .HasDefaultValueSql("'Medium'::\"AlertSeverity\"");
+
+            // ✅ Index mới: filter theo BatchId + SensorType + IsActive (tối ưu query realtime)
+            entity.HasIndex(e => new { e.BatchId, e.SensorType, e.IsActive },
+                "IX_SensorThresholdRules_Batch_SensorType_Active");
+
             entity.HasOne(d => d.Batch).WithMany(p => p.SensorThresholdRules)
                 .HasForeignKey(d => d.BatchId)
                 .OnDelete(DeleteBehavior.Cascade)

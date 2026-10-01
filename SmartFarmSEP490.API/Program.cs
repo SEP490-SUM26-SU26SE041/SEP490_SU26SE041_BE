@@ -78,6 +78,8 @@ using SmartFarmSEP490.Service.Interfaces.Mqtt;
 using SmartFarmSEP490.Service.Services.Mqtt;
 using SmartFarmSEP490.Service.Interfaces.Dashboard;
 using SmartFarmSEP490.Service.Services.Dashboard;
+using SmartFarmSEP490.Service.Interfaces.SensorThresholds;
+using SmartFarmSEP490.Service.Services.SensorThresholds;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -197,6 +199,10 @@ builder.Services.AddSingleton<IMqttSettings>(sp =>
 
 // MQTT Message Handler (scoped vì dùng DB context)
 builder.Services.AddScoped<IMqttMessageHandler, MqttMessageHandler>();
+
+// ✅ Sensor Threshold Rules
+builder.Services.AddScoped<ISensorThresholdRuleService, SensorThresholdRuleService>();
+builder.Services.AddScoped<IThresholdEvaluationService, ThresholdEvaluationService>();
 
 // MQTT Background Services
 builder.Services.AddHostedService<MqttHostedService>();

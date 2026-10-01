@@ -174,17 +174,38 @@ public class DashboardService : IDashboardService
         var sensors = await _sensorRepository.GetAllAsync();
 
         var result = new List<LatestSensorReadingDto>();
-        var thresholds = _context.SensorThresholdRules.Where(r => r.IsActive).ToList();
+
+        // ✅ Load 1 lần tất cả rules active đang áp dụng
+        var thresholdsQuery = _context.SensorThresholdRules.Where(r => r.IsActive);
+        if (experimentId.HasValue)
+            thresholdsQuery = thresholdsQuery.Where(r => r.ExperimentId == experimentId.Value);
+        var thresholds = await thresholdsQuery.ToListAsync();
 
         foreach (var sensor in sensors)
         {
+            // ✅ Filter threshold theo SensorType:
+            //    1. Rule có SensorType = sensor.SensorType (rule riêng cho loại này)
+            //    2. HOẶC Rule có SensorType = NULL (rule áp dụng cho mọi loại)
+            var sensorType = sensor.SensorType;
+            var applicableRules = thresholds.Where(t =>
+                t.SensorType == null || t.SensorType == sensorType
+            ).ToList();
+
+            // Chọn rule cụ thể nhất (SensorType = sensor.SensorType) ưu tiên trước
+            // Nếu không có thì dùng rule generic (SensorType = NULL)
+            var threshold = applicableRules
+                .OrderByDescending(t => t.SensorType.HasValue) // ưu tiên rule cụ thể (HasValue=true)
+                .ThenBy(t => t.BatchId.HasValue ? 0 : 1)       // ưu tiên rule theo Batch hơn theo Experiment
+                .FirstOrDefault();
+
             var latestReading = await _sensorRepository.GetLatestReadingBySensorAsync(sensor.Id);
-            var threshold = thresholds.FirstOrDefault(t => t.BatchId.HasValue || t.ExperimentId == (experimentId ?? Guid.Empty));
 
             var status = "Normal";
-            if (latestReading != null && threshold != null)
+            if (latestReading != null && threshold is not null)
             {
-                if (latestReading.Value < (threshold.MinValue ?? 0) || latestReading.Value > (threshold.MaxValue ?? decimal.MaxValue))
+                var belowMin = threshold.MinValue.HasValue && latestReading.Value < threshold.MinValue.Value;
+                var aboveMax = threshold.MaxValue.HasValue && latestReading.Value > threshold.MaxValue.Value;
+                if (belowMin || aboveMax)
                     status = "Alert";
             }
 
@@ -192,7 +213,7 @@ public class DashboardService : IDashboardService
             {
                 SensorId = sensor.Id,
                 SensorCode = sensor.SensorCode,
-                SensorType = sensor.SensorType.ToString(),
+                SensorType = sensorType.ToString(),
                 LatestValue = latestReading?.Value ?? 0,
                 Unit = latestReading?.Unit,
                 LastRecordedAt = latestReading?.RecordedAt ?? DateTime.MinValue,
