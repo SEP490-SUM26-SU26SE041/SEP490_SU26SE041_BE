@@ -7,6 +7,7 @@ using SmartFarmSEP490.Model;
 using SmartFarmSEP490.Repository.Interfaces.IoTDevices;
 using SmartFarmSEP490.Repository.Interfaces.Sensors;
 using SmartFarmSEP490.Service.Interfaces.Mqtt;
+using SmartFarmSEP490.Service.Interfaces.SensorThresholds;
 
 namespace SmartFarmSEP490.Service.Services.Mqtt;
 
@@ -21,17 +22,20 @@ public class MqttMessageHandler : IMqttMessageHandler
     private readonly IIoTDeviceRepository _deviceRepository;
     private readonly ISensorRepository _sensorRepository;
     private readonly IMqttSettings _mqttSettings;
+    private readonly IThresholdEvaluationService _thresholdEvaluation;
 
     public MqttMessageHandler(
         ILogger<MqttMessageHandler> logger,
         IIoTDeviceRepository deviceRepository,
         ISensorRepository sensorRepository,
-        IMqttSettings mqttSettings)
+        IMqttSettings mqttSettings,
+        IThresholdEvaluationService thresholdEvaluation)
     {
         _logger = logger;
         _deviceRepository = deviceRepository;
         _sensorRepository = sensorRepository;
         _mqttSettings = mqttSettings;
+        _thresholdEvaluation = thresholdEvaluation;
     }
 
     public async Task HandleAsync(string topic, string payload)
@@ -154,6 +158,22 @@ public class MqttMessageHandler : IMqttMessageHandler
 
                     await _sensorRepository.AddSensorDataAsync(sensorData);
                     savedCount++;
+
+                    // ✅ Đánh giá threshold SAU KHI lưu (không chặn flow MQTT)
+                    // Lưu ý: chỉ evaluate nếu Sensor không null
+                    if (mapping.Sensor != null)
+                    {
+                        try
+                        {
+                            await _thresholdEvaluation.EvaluateAsync(mapping.Sensor, sensorData);
+                        }
+                        catch (Exception ex)
+                        {
+                            // Không để lỗi threshold làm fail MQTT flow
+                            _logger.LogError(ex,
+                                "[MQTT] Error evaluating threshold for Sensor {SensorId}", mapping.SensorId);
+                        }
+                    }
                 }
 
                 _logger.LogInformation("[MQTT] 📝 Total records saved: {Count}", savedCount);
