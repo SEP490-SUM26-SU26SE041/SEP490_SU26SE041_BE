@@ -12,18 +12,14 @@ namespace SmartFarmSEP490.API.Controllers;
 
 /// <summary>
 /// API quản lý SensorThresholdRule (luật ngưỡng cảnh báo cảm biến).
+/// Quyền: Researcher, Technician, Student — full quyền (xem + tạo + sửa + xóa + toggle).
 /// </summary>
 /// <remarks>
-/// <para><b>Quyền truy cập:</b></para>
-/// <list type="bullet">
-/// <item><b>GET</b> (xem): <c>Researcher</c>, <c>Technician</c>, <c>Student</c> - xem được rule.</item>
-/// <item><b>POST/PUT/PATCH/DELETE</b> (quản lý): chỉ <c>Researcher</c> - người chủ experiment tự cấu hình rule.</item>
-/// </list>
 /// <para>Rule có thể để <c>SensorType = null</c> để áp dụng cho mọi loại cảm biến.</para>
 /// </remarks>
 [Route("api/threshold-rules")]
 [ApiController]
-[Authorize(Roles = "Researcher")]
+[Authorize(Roles = "Researcher,Technician,Student")]
 public class SensorThresholdRulesController : ControllerBase
 {
     private readonly ISensorThresholdRuleService _service;
@@ -39,14 +35,13 @@ public class SensorThresholdRulesController : ControllerBase
 
     /// <summary>
     /// Lấy danh sách rules (hỗ trợ filter).
-    /// <para><b>Quyền:</b> Researcher, Technician, Student (xem).</para>
+    /// <para><b>Quyền:</b> Researcher, Technician, Student.</para>
     /// </summary>
     /// <param name="experimentId">Lọc theo experiment.</param>
     /// <param name="batchId">Lọc theo batch.</param>
     /// <param name="sensorType">Lọc theo loại cảm biến.</param>
     /// <param name="isActive">Lọc theo trạng thái active.</param>
     [HttpGet]
-    [Authorize(Roles = "Researcher,Technician,Student")]
     public async Task<IActionResult> GetAll(
         [FromQuery] Guid? experimentId,
         [FromQuery] Guid? batchId,
@@ -67,10 +62,9 @@ public class SensorThresholdRulesController : ControllerBase
 
     /// <summary>
     /// Lấy chi tiết 1 rule.
-    /// <para><b>Quyền:</b> Researcher, Technician, Student (xem).</para>
+    /// <para><b>Quyền:</b> Researcher, Technician, Student.</para>
     /// </summary>
     [HttpGet("{id:guid}")]
-    [Authorize(Roles = "Researcher,Technician,Student")]
     public async Task<IActionResult> GetById(Guid id)
     {
         var result = await _service.GetByIdAsync(id);
@@ -81,13 +75,12 @@ public class SensorThresholdRulesController : ControllerBase
 
     /// <summary>
     /// Tìm rule áp dụng được cho 1 sensor cụ thể.
-    /// <para><b>Quyền:</b> Researcher, Technician, Student (xem).</para>
+    /// <para><b>Quyền:</b> Researcher, Technician, Student.</para>
     /// </summary>
     /// <param name="sensorType">Loại cảm biến.</param>
     /// <param name="batchId">Batch (có thể null).</param>
     /// <param name="experimentId">Experiment.</param>
     [HttpGet("applicable")]
-    [Authorize(Roles = "Researcher,Technician,Student")]
     public async Task<IActionResult> FindApplicable(
         [FromQuery] SensorType sensorType,
         [FromQuery] Guid? batchId,
@@ -101,7 +94,7 @@ public class SensorThresholdRulesController : ControllerBase
 
     /// <summary>
     /// Tạo mới 1 rule (gắn với batch cụ thể — ExperimentId tự suy ra từ Batch).
-    /// <para><b>Quyền:</b> chỉ <c>Researcher</c> (người cấu hình threshold cho experiment của mình).</para>
+    /// <para><b>Quyền:</b> Researcher, Technician, Student.</para>
     /// </summary>
     /// <remarks>
     /// <para><b>Thay đổi:</b> từ phiên bản này, DTO tạo rule yêu cầu <c>batchId</c> bắt buộc
@@ -137,7 +130,7 @@ public class SensorThresholdRulesController : ControllerBase
 
     /// <summary>
     /// Tạo rule áp dụng cho TOÀN experiment (BatchId=null — áp dụng cho mọi batch).
-    /// <para><b>Quyền:</b> chỉ <c>Researcher</c>.</para>
+    /// <para><b>Quyền:</b> Researcher, Technician, Student.</para>
     /// </summary>
     /// <remarks>
     /// <para><b>Khi nào dùng endpoint này?</b></para>
@@ -182,7 +175,7 @@ public class SensorThresholdRulesController : ControllerBase
 
     /// <summary>
     /// Cập nhật 1 rule (partial update).
-    /// <para><b>Quyền:</b> chỉ <c>Researcher</c>.</para>
+    /// <para><b>Quyền:</b> Researcher, Technician, Student.</para>
     /// </summary>
     [HttpPut("{id:guid}")]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateSensorThresholdRuleDto dto)
@@ -211,7 +204,7 @@ public class SensorThresholdRulesController : ControllerBase
 
     /// <summary>
     /// Bật/tắt nhanh 1 rule.
-    /// <para><b>Quyền:</b> chỉ <c>Researcher</c>.</para>
+    /// <para><b>Quyền:</b> Researcher, Technician, Student.</para>
     /// </summary>
     [HttpPatch("{id:guid}/toggle")]
     public async Task<IActionResult> Toggle(Guid id, [FromBody] bool isActive)
@@ -234,7 +227,7 @@ public class SensorThresholdRulesController : ControllerBase
 
     /// <summary>
     /// Xóa 1 rule.
-    /// <para><b>Quyền:</b> chỉ <c>Researcher</c>.</para>
+    /// <para><b>Quyền:</b> Researcher, Technician, Student.</para>
     /// </summary>
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id)

@@ -12,13 +12,11 @@ namespace SmartFarmSEP490.API.Controllers;
 
 /// <summary>
 /// API quản lý thiết bị IoT (ESP32-C3 Water Sensor).
-/// Quyền:
-///   - GET (xem): Researcher, Technician, Student — xem được device & sensor data.
-///   - POST/PUT/DELETE/Assign/Toggle: chỉ Researcher — người chủ experiment tự quản lý.
+/// Quyền: Researcher, Technician, Student — full quyền (xem + tạo + sửa + xóa + gán batch + toggle IoT).
 /// </summary>
 [Route("api/iot-devices")]
 [ApiController]
-[Authorize(Roles = "Researcher")] // Class-level: mặc định cho Researcher. GET sẽ override bên dưới.
+[Authorize(Roles = "Researcher,Technician,Student")]
 public class IoTDevicesController : ControllerBase
 {
     private readonly IIoTDeviceService _service;
@@ -32,10 +30,9 @@ public class IoTDevicesController : ControllerBase
 
     /// <summary>
     /// Lấy danh sách tất cả thiết bị IoT.
-    /// <para><b>Quyền:</b> Researcher, Technician, Student (xem).</para>
+    /// <para><b>Quyền:</b> Researcher, Technician, Student.</para>
     /// </summary>
     [HttpGet]
-    [Authorize(Roles = "Researcher,Technician,Student")]
     public async Task<IActionResult> GetAll()
     {
         var result = await _service.GetAllAsync();
@@ -44,10 +41,9 @@ public class IoTDevicesController : ControllerBase
 
     /// <summary>
     /// Lấy danh sách thiết bị đang offline.
-    /// <para><b>Quyền:</b> Researcher, Technician, Student (xem).</para>
+    /// <para><b>Quyền:</b> Researcher, Technician, Student.</para>
     /// </summary>
     [HttpGet("offline")]
-    [Authorize(Roles = "Researcher,Technician,Student")]
     public async Task<IActionResult> GetOfflineDevices()
     {
         var result = await _service.GetOfflineDevicesAsync();
@@ -56,10 +52,9 @@ public class IoTDevicesController : ControllerBase
 
     /// <summary>
     /// Lấy chi tiết 1 thiết bị.
-    /// <para><b>Quyền:</b> Researcher, Technician, Student (xem).</para>
+    /// <para><b>Quyền:</b> Researcher, Technician, Student.</para>
     /// </summary>
     [HttpGet("{id:guid}")]
-    [Authorize(Roles = "Researcher,Technician,Student")]
     public async Task<IActionResult> GetById(Guid id)
     {
         var result = await _service.GetByIdAsync(id);
@@ -70,10 +65,9 @@ public class IoTDevicesController : ControllerBase
 
     /// <summary>
     /// Lấy thiết bị theo DeviceCode (dùng cho MQTT auto-discovery).
-    /// <para><b>Quyền:</b> Researcher, Technician, Student (xem).</para>
+    /// <para><b>Quyền:</b> Researcher, Technician, Student.</para>
     /// </summary>
     [HttpGet("code/{deviceCode}")]
-    [Authorize(Roles = "Researcher,Technician,Student")]
     public async Task<IActionResult> GetByDeviceCode(string deviceCode)
     {
         var result = await _service.GetByDeviceCodeAsync(deviceCode);
@@ -84,10 +78,9 @@ public class IoTDevicesController : ControllerBase
 
     /// <summary>
     /// Lấy danh sách thiết bị theo BatchId.
-    /// <para><b>Quyền:</b> Researcher, Technician, Student (xem).</para>
+    /// <para><b>Quyền:</b> Researcher, Technician, Student.</para>
     /// </summary>
     [HttpGet("batch/{batchId:guid}")]
-    [Authorize(Roles = "Researcher,Technician,Student")]
     public async Task<IActionResult> GetByBatch(Guid batchId)
     {
         var result = await _service.GetByBatchIdAsync(batchId);
@@ -96,6 +89,7 @@ public class IoTDevicesController : ControllerBase
 
     /// <summary>
     /// Tạo mới thiết bị IoT.
+    /// <para><b>Quyền:</b> Researcher, Technician, Student.</para>
     /// </summary>
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateIoTDeviceDto dto)
@@ -120,6 +114,7 @@ public class IoTDevicesController : ControllerBase
 
     /// <summary>
     /// Cập nhật thiết bị IoT.
+    /// <para><b>Quyền:</b> Researcher, Technician, Student.</para>
     /// </summary>
     [HttpPut("{id:guid}")]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateIoTDeviceDto dto)
@@ -147,6 +142,7 @@ public class IoTDevicesController : ControllerBase
 
     /// <summary>
     /// Xóa thiết bị IoT.
+    /// <para><b>Quyền:</b> Researcher, Technician, Student.</para>
     /// </summary>
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id)
@@ -159,6 +155,7 @@ public class IoTDevicesController : ControllerBase
 
     /// <summary>
     /// Gán thiết bị vào Batch (hoặc gỡ nếu BatchId = null).
+    /// <para><b>Quyền:</b> Researcher, Technician, Student.</para>
     /// </summary>
     [HttpPost("assign-batch")]
     public async Task<IActionResult> AssignToBatch([FromBody] AssignDeviceToBatchDto dto)
@@ -185,6 +182,7 @@ public class IoTDevicesController : ControllerBase
 
     /// <summary>
     /// Bật/tắt IoT cho một Batch.
+    /// <para><b>Quyền:</b> Researcher, Technician, Student.</para>
     /// </summary>
     [HttpPost("batch/toggle-iot")]
     public async Task<IActionResult> ToggleBatchIoT([FromBody] ToggleBatchIoTDto dto)
@@ -209,10 +207,9 @@ public class IoTDevicesController : ControllerBase
 
     /// <summary>
     /// Lấy lịch sử dữ liệu cảm biến của 1 thiết bị.
-    /// <para><b>Quyền:</b> Researcher, Technician, Student (xem).</para>
+    /// <para><b>Quyền:</b> Researcher, Technician, Student.</para>
     /// </summary>
     [HttpGet("{id:guid}/sensor-data")]
-    [Authorize(Roles = "Researcher,Technician,Student")]
     public async Task<IActionResult> GetSensorData(
         Guid id,
         [FromQuery] DateTime? fromDate,
@@ -227,10 +224,9 @@ public class IoTDevicesController : ControllerBase
 
     /// <summary>
     /// Lấy giá trị cảm biến mới nhất của 1 thiết bị.
-    /// <para><b>Quyền:</b> Researcher, Technician, Student (xem).</para>
+    /// <para><b>Quyền:</b> Researcher, Technician, Student.</para>
     /// </summary>
     [HttpGet("{id:guid}/sensor-data/latest")]
-    [Authorize(Roles = "Researcher,Technician,Student")]
     public async Task<IActionResult> GetLatestSensorData(Guid id)
     {
         var result = await _service.GetLatestSensorDataAsync(id);
