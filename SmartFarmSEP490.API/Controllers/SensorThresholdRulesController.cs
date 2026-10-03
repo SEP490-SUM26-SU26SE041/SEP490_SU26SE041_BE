@@ -16,7 +16,7 @@ namespace SmartFarmSEP490.API.Controllers;
 /// <remarks>
 /// <para><b>Quyền truy cập:</b></para>
 /// <list type="bullet">
-/// <item><b>GET</b> (xem): <c>Researcher</c>, <c>Technician</c>, <c>Manager</c> - xem được rule.</item>
+/// <item><b>GET</b> (xem): <c>Researcher</c>, <c>Technician</c>, <c>Student</c> - xem được rule.</item>
 /// <item><b>POST/PUT/PATCH/DELETE</b> (quản lý): chỉ <c>Researcher</c> - người chủ experiment tự cấu hình rule.</item>
 /// </list>
 /// <para>Rule có thể để <c>SensorType = null</c> để áp dụng cho mọi loại cảm biến.</para>
@@ -39,14 +39,14 @@ public class SensorThresholdRulesController : ControllerBase
 
     /// <summary>
     /// Lấy danh sách rules (hỗ trợ filter).
-    /// <para><b>Quyền:</b> Researcher, Technician, Manager (xem).</para>
+    /// <para><b>Quyền:</b> Researcher, Technician, Student (xem).</para>
     /// </summary>
     /// <param name="experimentId">Lọc theo experiment.</param>
     /// <param name="batchId">Lọc theo batch.</param>
     /// <param name="sensorType">Lọc theo loại cảm biến.</param>
     /// <param name="isActive">Lọc theo trạng thái active.</param>
     [HttpGet]
-    [Authorize(Roles = "Researcher,Technician,Manager")]
+    [Authorize(Roles = "Researcher,Technician,Student")]
     public async Task<IActionResult> GetAll(
         [FromQuery] Guid? experimentId,
         [FromQuery] Guid? batchId,
@@ -67,10 +67,10 @@ public class SensorThresholdRulesController : ControllerBase
 
     /// <summary>
     /// Lấy chi tiết 1 rule.
-    /// <para><b>Quyền:</b> Researcher, Technician, Manager (xem).</para>
+    /// <para><b>Quyền:</b> Researcher, Technician, Student (xem).</para>
     /// </summary>
     [HttpGet("{id:guid}")]
-    [Authorize(Roles = "Researcher,Technician,Manager")]
+    [Authorize(Roles = "Researcher,Technician,Student")]
     public async Task<IActionResult> GetById(Guid id)
     {
         var result = await _service.GetByIdAsync(id);
@@ -81,13 +81,13 @@ public class SensorThresholdRulesController : ControllerBase
 
     /// <summary>
     /// Tìm rule áp dụng được cho 1 sensor cụ thể.
-    /// <para><b>Quyền:</b> Researcher, Technician, Manager (xem).</para>
+    /// <para><b>Quyền:</b> Researcher, Technician, Student (xem).</para>
     /// </summary>
     /// <param name="sensorType">Loại cảm biến.</param>
     /// <param name="batchId">Batch (có thể null).</param>
     /// <param name="experimentId">Experiment.</param>
     [HttpGet("applicable")]
-    [Authorize(Roles = "Researcher,Technician,Manager")]
+    [Authorize(Roles = "Researcher,Technician,Student")]
     public async Task<IActionResult> FindApplicable(
         [FromQuery] SensorType sensorType,
         [FromQuery] Guid? batchId,
