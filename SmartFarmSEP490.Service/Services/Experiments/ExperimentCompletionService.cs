@@ -9,8 +9,8 @@ namespace SmartFarmSEP490.Service.Services.Experiments;
 /// <summary>
 /// Xử lý nghiệp vụ "hoàn thành" experiment:
 ///   - Auto-complete theo EndDate (gọi từ BackgroundService).
-///   - Manual complete từ UpdateStatusAsync.
-/// Cả hai đường đều release bed assignments.
+///   - Manual complete hoặc cancel từ UpdateStatusAsync.
+/// Cả ba đường (Completed/Cancelled/manual/auto) đều release bed assignments.
 /// </summary>
 public class ExperimentCompletionService : IExperimentCompletionService
 {
@@ -77,13 +77,10 @@ public class ExperimentCompletionService : IExperimentCompletionService
             return;
         }
 
-        // Idempotent: nếu đã Completed rồi thì chỉ cần release (nếu chưa release)
-        if (entity.Status != ExperimentStatus.Completed)
-        {
-            entity.Status = ExperimentStatus.Completed;
-            entity.UpdatedAt = DateTime.UtcNow;
-        }
-
+        // Idempotent: chi release neu con assignment Active.
+        // Status (Completed hoac Cancelled) da duoc set boi caller (UpdateStatusAsync)
+        // truoc khi goi CompleteAsync, nen khong ghi de o day.
+        // Trong ca hai tru hop hop le (terminal state), bed assignments deu duoc release.
         await _bedAssignmentRepository.ReleaseBedsAsync(experimentId);
     }
 }

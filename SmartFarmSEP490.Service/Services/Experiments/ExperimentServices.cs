@@ -217,10 +217,11 @@ public class ExperimentService : IExperimentService
             entity.Status = newStatus;
             await _experimentRepository.UpdateAsync(entity);
 
-            // Khi thuc nghiem chuyen sang Completed (terminal) → release moi bed assignment
-            // de bed co the duoc dung cho experiment moi. Cancel KHONG release bed theo nghiep vu
-            // (manager/researcher can tu don dep neu muon).
-            if (newStatus == ExperimentStatus.Completed && entity.Status != ExperimentStatus.Completed)
+            // Khi thuc nghiem chuyen sang trang thai ket thuc (Completed hoac Cancelled)
+            // → release moi bed assignment de bed co the duoc dung cho experiment moi.
+            // Idempotent: CompleteAsync chi release neu con assignment Active, khong tao double-release.
+            if ((newStatus == ExperimentStatus.Completed || newStatus == ExperimentStatus.Cancelled)
+                && entity.Status != newStatus)
             {
                 await _completionService.CompleteAsync(id);
             }

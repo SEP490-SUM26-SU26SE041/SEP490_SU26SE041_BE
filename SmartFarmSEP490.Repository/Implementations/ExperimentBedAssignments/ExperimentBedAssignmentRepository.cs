@@ -88,7 +88,9 @@ public class ExperimentBedAssignmentRepository : IExperimentBedAssignmentReposit
     public async Task ReleaseBedsAsync(Guid experimentId)
     {
         var assignments = await _context.ExperimentBedAssignments
-            .Where(e => e.ExperimentId == experimentId).ToListAsync();
+            .Where(e => e.ExperimentId == experimentId
+                        && e.Status != AllocationStatus.Released)
+            .ToListAsync();
         foreach (var a in assignments)
         {
             // GIU ExperimentId de truy vet lich su (audit trail).
